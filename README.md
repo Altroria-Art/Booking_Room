@@ -25,9 +25,9 @@ This project is part of the Fundamental of Database System and Software Requirem
 
 | Student ID | Name (English)             | ชื่อ (ไทย)                          |
 |------------|----------------------------|--------------------------------------|
-| 67025044   | Mr. Rinraphat Seankham     | นายรินรพัชร แสนคำ           |
-| 67022928   | Mr. Somphon hyodyoi       | นายสมพล หยดย้อย              |
-| 67023019   | Mr. Aphisup Parahan   | นายอภิทรัพย์ ภาระหันต์             |
+| 67025044   | Mr. Rinraphat Seankham     | นายรินรพัชร แสนคำ                    |
+| 67022928   | Mr. Somphon hyodyoi        | นายสมพล หยดย้อย                    |
+| 67023019   | Mr. Aphisup Parahan        | นายอภิทรัพย์ ภาระหันต์                 |
 |    |             |                       |
 
 ## Contact
