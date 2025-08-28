@@ -28,7 +28,7 @@ This project is part of the Fundamental of Database System and Software Requirem
 | 67025044   | Mr. Rinraphat Seankham     | นายรินรพัชร แสนคำ                    |
 | 67022928   | Mr. Somphon hyodyoi        | นายสมพล หยดย้อย                    |
 | 67023019   | Mr. Aphisup Parahan        | นายอภิทรัพย์ ภาระหันต์                 |
-| 67026494   | Ms. Suchanad Maja          |  นางสาวศุชานาถ ม้าจ่า                    |
+| 67026494   | Ms. Suchanad Maja          | นางสาวศุชานาถ ม้าจ่า                  |
 
 ## Contact
 
