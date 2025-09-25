@@ -6,7 +6,9 @@ import MainNavbar from './components/MainNavbar.vue'
 <template>
   <div class="page">
     <MainNavbar />
-
+    <h1>
+      hello nong
+    </h1>
     <!-- <section class="section">
         <h2>จองห้อง Study Room</h2>
         <DayTimeline />
