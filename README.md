@@ -17,7 +17,7 @@ This project is part of the Fundamental of Database System and Software Requirem
 
 ## Tech stack Frontend
 
-- <img src="https://cdn.simpleicons.org/java" alt="Java" width="40"/> Java  
+- <img src="https://cdn.simpleicons.org/openjdk" alt="Java" width="40"/> Java  
 - <img src="https://cdn.simpleicons.org/html5" alt="HTML5" width="40"/> HTML5  
 - <img src="https://cdn.simpleicons.org/vuedotjs" alt="Vue.js" width="40"/> Vue.js
 
