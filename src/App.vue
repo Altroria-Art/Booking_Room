@@ -6,11 +6,9 @@ import MainNavbar from './components/MainNavbar.vue'
 <template>
   <div class="page">
     <MainNavbar />
-
-    <!-- <section class="section">
-        <h2>จองห้อง Study Room</h2>
-        <DayTimeline />
-    </section> -->
+    <h1>
+      Hello World
+    </h1>
   </div>
 </template>
 
