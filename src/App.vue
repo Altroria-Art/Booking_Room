@@ -7,7 +7,7 @@ import MainNavbar from './components/MainNavbar.vue'
   <div class="page">
     <MainNavbar />
     <h1>
-      Hello World
+      Hello World, hello nong
     </h1>
   </div>
 </template>
