@@ -1,6 +1,5 @@
 <script setup>
-import MainNavbar from './components/MainNavbar.vue'
-// import DayTimeline from './components/DayTimeline.vue';
+  import MainNavbar from './components/MainNavbar.vue'
 </script>
 
 <template>
