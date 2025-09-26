@@ -23,12 +23,13 @@
 <style scoped>
 /* แถบ navbar */
 .nav {
-  background: #ffffff;                  /* พื้นขาวแบบรูป */
-  border-radius: 12px;
-  margin: 16px auto;
-  max-width: 1100px;
+  background: #ffffff;     /* สีพื้นหลัง */
+  border-radius: 0;        /* เอาโค้งออก (ถ้าอยากให้เต็มจอจริงๆ) */
+  margin: 0;               /* ยกเลิก margin */
+  width: 100%;             /* ให้กว้างเต็มจอ */
   box-shadow: 0 6px 18px rgba(0,0,0,.05);
 }
+
 
 /* คอนเทนต์ด้านใน */
 .nav-wrap{
