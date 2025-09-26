@@ -1,7 +1,8 @@
 <script setup>
-import MainNavbar from './components/MainNavbar.vue'
-import Popup from './components/Popup.vue'
-import { ref } from 'vue'
+ import MainNavbar from './components/MainNavbar.vue'
+ import HeroSection from './components/HeroSection.vue'
+ import Popup from './components/Popup.vue'
+ import { ref } from 'vue'
 
 const show = ref(false)
 const success = ref(false)
@@ -20,6 +21,7 @@ function cancel() {
 <template>
   <div>
     <MainNavbar />
+    <HeroSection />
 
     <button @click="showPopup(true)">จองสำเร็จ</button>
     <button @click="showPopup(false)">จองไม่สำเร็จ</button>
@@ -30,5 +32,4 @@ function cancel() {
       @close="show=false"
       @cancel="cancel"
     />
-  </div>
 </template>
