@@ -32,4 +32,5 @@ function cancel() {
       @close="show=false"
       @cancel="cancel"
     />
+  </div>
 </template>
