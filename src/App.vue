@@ -8,7 +8,7 @@
   const show = ref(false)
   const success = ref(false)
 
-  const showPopup = ref(false);
+  const openPopup = ref(false);
   const user = {
     firstName: "สมพล",
     lastName: "หยดย้อย",
@@ -46,12 +46,12 @@
   </div>
 
   <div>
-    <button @click="showPopup = true">ดูโปรไฟล์</button>
+    <button @click="openPopup = true">ดูโปรไฟล์</button>
 
     <UserPopup 
-      :show="showPopup" 
+      :show="openPopup" 
       :user="user" 
-      @close="showPopup = false"
+      @close="openPopup = false"
     />
   </div>
 </template>
