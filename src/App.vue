@@ -1,13 +1,12 @@
 <script setup>
-  import MainNavbar from './components/MainNavbar.vue'
+import MainNavbar from './components/MainNavbar.vue'
+import HeroSection from './components/HeroSection.vue'
 </script>
 
 <template>
-  <div class="page">
+  <div >
     <MainNavbar />
-    <h1>
-      
-    </h1>
+    <HeroSection />
   </div>
 </template>
 
