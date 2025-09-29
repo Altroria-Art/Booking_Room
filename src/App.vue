@@ -3,7 +3,8 @@
   import HeroSection from './components/HeroSection.vue'
   import Popup from './components/Popup.vue'
   import { ref } from 'vue'
-  import UserPopup from "./components/Popupprofile.vue";
+  import UserPopup from "./components/Popupprofile.vue"
+  import RoomSchedule from './components/RoomSchedule.vue';
 
   const show = ref(false)
   const success = ref(false)
@@ -54,4 +55,8 @@
       @close="openPopup = false"
     />
   </div>
+  <div>
+    <RoomSchedule/>
+  </div>
 </template>
+
