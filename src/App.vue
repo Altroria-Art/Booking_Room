@@ -4,6 +4,7 @@
   import Popup from './components/Popup.vue'
   import { ref } from 'vue'
   import UserPopup from "./components/Popupprofile.vue";
+  import ReviewRoom from './components/ReviewRoom.vue';
 
   const show = ref(false)
   const success = ref(false)
@@ -31,6 +32,7 @@
   <div>
     <MainNavbar />
     <HeroSection />
+    <ReviewRoom />
   </div>
 
   <div>
