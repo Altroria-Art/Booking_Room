@@ -8,7 +8,6 @@
   <div>
     <MainNavbar />
     <HeroSection />
-    <RouterView />
   </div>
 </template>
 
