@@ -2,13 +2,13 @@
 import { ref, computed, watch, onMounted } from 'vue'
 
 // ======= state หลัก =======
-const open = defineModel('open', { type: Boolean, default: false })   // v-model:open จากพาเรนต์
+const open = defineModel('open', { type: Boolean, default: false })
 const loading = ref(false)
 const errorMsg = ref('')
 
 // ดึง master data
 const roomTypes = ref([]) // [{id,type_name}]
-const rooms = ref([])     // [{id,room_code,type_name}]
+const rooms = ref([])     // [{id,room_code,type_id,type_name}]
 const filteredRooms = computed(() => {
   if (!selectedTypeId.value) return []
   return rooms.value.filter(r => r.type_id === selectedTypeId.value)
@@ -17,85 +17,50 @@ const filteredRooms = computed(() => {
 const selectedTypeId = ref(null)
 const selectedRoomCode = ref('')
 
-// เวลา (step 30 นาที)
-const startAt = ref('')
-const endAt = ref('')
+// ========= เวลา (ชั่วโมงตรงเท่านั้น) =========
+const startAt = ref('')   // 'HH:MM'
+const endAt   = ref('')   // 'HH:MM'
 const date = ref(new Date().toISOString().slice(0,10)) // yyyy-mm-dd วันนี้
 
-// จำนวนผู้ใช้ และรหัสนิสิต
+// 08:00..16:00 เป็นชั่วโมงตรง
+const hourOptions = computed(() => {
+  const a = []
+  for (let h = 8; h <= 16; h++) a.push(`${String(h).padStart(2,'0')}:00`)
+  return a
+})
+// start เลือกได้ 08:00..15:00 (ต้องมี end อย่างน้อย +1 ชม.)
+const startOptions = computed(() => hourOptions.value.filter(t => t < '16:00'))
+// end เลือกได้ตั้งแต่ start+1h ถึง min(start+2h, 16:00)
+const endOptions = computed(() => {
+  if (!startAt.value) return []
+  const [h] = startAt.value.split(':').map(Number)
+  const e1 = `${String(Math.min(h+1,16)).padStart(2,'0')}:00`
+  const e2 = `${String(Math.min(h+2,16)).padStart(2,'0')}:00`
+  return hourOptions.value.filter(t => t >= e1 && t <= e2)
+})
+// ถ้าเปลี่ยน start แล้ว end หลุดช่วง ให้เคลียร์
+watch(startAt, () => {
+  if (endAt.value && !endOptions.value.includes(endAt.value)) endAt.value = ''
+})
+
+// ========= จำนวนผู้ใช้ และรหัสนิสิต =========
 const memberCount = ref(5) // default 5
 const memberIds = ref(Array.from({length: 5}, () => ''))
 
 watch(memberCount, (n) => {
   const cur = memberIds.value.length
-  if (n > cur) {
-    for (let i=0; i<n-cur; i++) memberIds.value.push('')
-  } else if (n < cur) {
-    memberIds.value.splice(n)
-  }
+  if (n > cur) for (let i=0; i<n-cur; i++) memberIds.value.push('')
+  else if (n < cur) memberIds.value.splice(n)
 })
 
-// จำกัด end ≤ start + 120 นาที
-watch(startAt, () => {
-  if (!startAt.value || !endAt.value) return
-  if (minutesDiff(startAt.value, endAt.value) > 120) {
-    endAt.value = addMinutes(startAt.value, 120)
-  }
-})
-watch(endAt, () => {
-  if (!startAt.value || !endAt.value) return
-  if (minutesDiff(startAt.value, endAt.value) > 120) {
-    endAt.value = addMinutes(startAt.value, 120)
-  }
-})
-
-// สร้างตัวเลือกเวลา 08:00–16:00 (step 30)
-const timeOptions = computed(() => {
-  const list = []
-  for (let h=8; h<=16; h++) {
-    for (let m of [0,30]) {
-      const hh = String(h).padStart(2,'0')
-      const mm = String(m).padStart(2,'0')
-      const t = `${hh}:${mm}`
-      list.push(t)
-    }
-  }
-  // เอา 16:30 ออก (เกิน) เหลือถึง 16:00
-  return list.filter(t => t <= '16:00')
-})
-
-// จำกัด end ให้ไม่เกิน 16:00 และ ≥ start
-const endOptions = computed(() => {
-  if (!startAt.value) return []
-  const out = []
-  for (const t of timeOptions.value) {
-    if (t > startAt.value) {
-      if (minutesDiff(startAt.value, t) <= 120) out.push(t)
-    }
-  }
-  return out
-})
-
-function minutesDiff(t1, t2) {
-  const [h1,m1] = t1.split(':').map(Number)
-  const [h2,m2] = t2.split(':').map(Number)
-  return (h2*60+m2) - (h1*60+m1)
-}
-function addMinutes(t, add) {
-  const [h,m] = t.split(':').map(Number)
-  const tot = h*60 + m + add
-  const nh = Math.floor(tot/60), nm = tot%60
-  return `${String(nh).padStart(2,'0')}:${String(nm).padStart(2,'0')}`
-}
-
-// โหลด room types/rooms
+// โหลด room types/rooms (ถ้าอยากโหลดห้องตามประเภท แนะนำไปใช้ watch(selectedTypeId) ดึง /api/rooms?typeId=...)
 async function fetchMasters() {
   const [rt, rs] = await Promise.all([
     fetch('/api/room-types').then(r=>r.json()),
     fetch('/api/rooms').then(r=>r.json())
   ])
   roomTypes.value = rt
-  rooms.value = rs   // expect {id, room_code, type_id, type_name}
+  rooms.value = rs
 }
 
 // reset เมื่อเปิด/ปิด
@@ -114,7 +79,6 @@ async function submit() {
     if (!selectedRoomCode.value) throw new Error('กรุณาเลือกห้อง')
     if (!startAt.value || !endAt.value) throw new Error('กรุณาเลือกเวลาเริ่ม/สิ้นสุด')
 
-    // ตรวจ memberIds ต้องกรอกครบและเป็นตัวเลข 5–10 ช่อง
     const list = memberIds.value.map(s => (s||'').trim()).filter(Boolean)
     if (list.length !== memberCount.value) throw new Error('กรุณากรอกรหัสนิสิตให้ครบตามจำนวนผู้ใช้')
 
@@ -122,7 +86,7 @@ async function submit() {
       room_code: selectedRoomCode.value,
       start_at: `${date.value} ${startAt.value}:00`,
       end_at:   `${date.value} ${endAt.value}:00`,
-      created_by: list[0],  // ถือว่าคนแรกเป็นผู้สร้าง
+      created_by: list[0],
       members: list
     }
 
@@ -135,7 +99,6 @@ async function submit() {
     const body = await r.json().catch(()=> ({}))
     if (!r.ok) throw new Error(body.error || 'สร้างการจองไม่สำเร็จ')
 
-    // success
     open.value = false
     alert('จองสำเร็จ')
   } catch (e) {
@@ -176,12 +139,12 @@ onMounted(fetchMasters)
           <label>เวลาเริ่มต้นการจอง *</label>
           <select v-model="startAt">
             <option value="">กรุณาเลือกเวลา</option>
-            <option v-for="t in timeOptions" :key="t" :value="t">{{ t }}</option>
+            <option v-for="t in startOptions" :key="t" :value="t">{{ t }}</option>
           </select>
         </div>
         <div>
           <label>เวลาสิ้นสุดการจอง *</label>
-          <select v-model="endAt">
+          <select v-model="endAt" :disabled="!startAt">
             <option value="">กรุณาเลือกเวลา</option>
             <option v-for="t in endOptions" :key="t" :value="t">{{ t }}</option>
           </select>
@@ -213,14 +176,8 @@ onMounted(fetchMasters)
 </template>
 
 <style scoped>
-.overlay{
-  position: fixed; inset:0; background: rgba(0,0,0,.35);
-  display:flex; align-items:center; justify-content:center; z-index:50;
-}
-.modal{
-  width: 520px; max-height: 85vh; overflow:auto;
-  background:#fff; border-radius:16px; padding:20px 24px; box-shadow:0 10px 30px rgba(0,0,0,.2);
-}
+.overlay{ position: fixed; inset:0; background: rgba(0,0,0,.35); display:flex; align-items:center; justify-content:center; z-index:50; }
+.modal{ width: 520px; max-height: 85vh; overflow:auto; background:#fff; border-radius:16px; padding:20px 24px; box-shadow:0 10px 30px rgba(0,0,0,.2); }
 .title{ font-size:22px; font-weight:800; margin-bottom:14px }
 .field{ margin-bottom:12px; display:flex; flex-direction:column; gap:6px }
 .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:12px }
