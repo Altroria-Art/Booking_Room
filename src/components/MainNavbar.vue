@@ -1,35 +1,34 @@
+<!-- src/components/MainNavbar.vue -->
 <template>
   <header class="nav">
     <div class="nav-wrap">
       <!-- logo -->
-      <a class="brand" href="#">
+      <RouterLink class="brand" to="/">
         <span class="brand-main">STUDYROOM</span>
         <span class="brand-accent">UP</span>
-      </a>
+      </RouterLink>
 
-      <!-- right links -->
+      <!-- right links (เหลือเฉพาะ Profile / Logout) -->
       <nav class="nav-links">
-        <a href="#" class="link">Profile</a>
-        <a href="#" class="link">Logout</a>
+        <RouterLink to="#" class="link">Profile</RouterLink>
+        <RouterLink to="#" class="link">Logout</RouterLink>
       </nav>
     </div>
   </header>
 </template>
 
 <script setup>
-// no script needed
+import { RouterLink } from 'vue-router'
 </script>
 
 <style scoped>
 /* แถบ navbar */
 .nav {
-  background: #ffffff;     /* สีพื้นหลัง */
-  border-radius: 0;        /* เอาโค้งออก (ถ้าอยากให้เต็มจอจริงๆ) */
-  margin: 0;               /* ยกเลิก margin */
-  width: 100%;             /* ให้กว้างเต็มจอ */
+  background: #ffffff;
+  margin: 0;
+  width: 100%;
   box-shadow: 0 6px 18px rgba(0,0,0,.05);
 }
-
 
 /* คอนเทนต์ด้านใน */
 .nav-wrap{
@@ -49,12 +48,12 @@
 }
 .brand-main{
   font-weight: 800;
-  color: #1f2d3d;                       /* เทาเข้ม */
+  color: #1f2d3d;
   font-size: 22px;
 }
 .brand-accent{
   font-weight: 900;
-  color: #5865f2;                       /* น้ำเงินม่วงแบบในภาพ */
+  color: #5865f2;
   font-size: 32px;
   line-height: 1;
 }
@@ -69,28 +68,22 @@
   position: relative;
   font-size: 14px;
   color: #334155;
-  text-decoration: none;
-  padding-bottom: 6px;
+  text-decoration: none;   /* ตัดเส้นใต้ทั้งหมด */
+  padding-bottom: 0;       /* ไม่เผื่อพื้นที่เส้นใต้ */
 }
 
-/* เส้นใต้สีน้ำเงินคงอยู่ */
-.link::after{
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 3px;
-  background: #5865f2;
-  border-radius: 2px;
-  opacity: .9;
+/* ปิด pseudo-element ทุกกรณี (กันพลาด) */
+.link::after,
+.link:hover::after,
+.link.router-link-active::after,
+.link.router-link-exact-active::after{
+  content: none !important;
+  display: none !important;
 }
 
-/* hover ให้เข้มขึ้นนิดหน่อย */
+/* hover แค่เปลี่ยนสีตัวอักษรเล็กน้อย */
 .link:hover{ color:#111827; }
-.link:hover::after{ opacity: 1; }
 
-/* responsive */
 @media (max-width: 720px){
   .brand-main{ font-size: 18px; }
   .brand-accent{ font-size: 26px; }

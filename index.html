@@ -1,10 +1,38 @@
 <!DOCTYPE html>
-<html lang="">
+<html lang="th">
   <head>
-    <meta charset="UTF-8">
-    <link rel="icon" href="/favicon.ico">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vite App</title>
+    <meta charset="UTF-8" />
+    <link rel="icon" href="/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>StudyRoom UP</title>
+
+    <!-- ✅ Preconnect & Load Sarabun -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- ✅ Apply global font (เผื่อยังไม่มี global CSS) -->
+    <style>
+      :root {
+        --font-th: 'Sarabun', system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue',
+          Arial, 'Noto Sans Thai', sans-serif;
+      }
+      html, body, #app {
+        height: 100%;
+      }
+      body {
+        margin: 0;
+        font-family: var(--font-th);
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        background: #ffffff;
+        color: #111827;
+      }
+    </style>
   </head>
   <body>
     <div id="app"></div>

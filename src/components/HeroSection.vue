@@ -1,25 +1,50 @@
 <template>
   <section class="hero">
     <img class="hero-img" src="/src/img/image 9.svg" alt="hero">
+
     <div class="overlay">
       <h2 class="subtitle">
         โปรแกรมจองห้อง ศูนย์บรรณสารและการเรียนรู้ สถาบันนวัตกรรมการเรียนรู้
       </h2>
       <h1 class="title">มหาวิทยาลัยพะเยา</h1>
     </div>
+
+    <!-- Tabs ใต้แบนเนอร์ -->
     <div class="overlay-buttons">
-      <button>จองห้อง</button>
-      <button>หลักฐานการจอง</button>
-      <button>รีวิว</button>
+      <RouterLink
+        to="/"
+        class="tab-link"
+        :class="{ active: isActive('/') }"
+      >จองห้อง</RouterLink>
+
+      <RouterLink
+        to="/history"
+        class="tab-link"
+        :class="{ active: isActive('/history') }"
+      >หลักฐานการจอง</RouterLink>
+
+      <RouterLink
+        to="/review"
+        class="tab-link"
+        :class="{ active: isActive('/review') }"
+      >รีวิว</RouterLink>
     </div>
   </section>
 </template>
 
+<script setup>
+import { RouterLink, useRoute } from 'vue-router'
+
+const route = useRoute()
+// ให้ active เฉพาะ path ที่ตรงกันแบบ exact
+const isActive = (path) => route.path === path
+</script>
+
 <style scoped>
 .hero {
   position: relative;
-  max-width: 1384px;   /* กว้างสุดไม่เกิน 1384 */
-  aspect-ratio: 1384 / 572;  /* รักษาสัดส่วน */
+  max-width: 1384px;
+  aspect-ratio: 1384 / 572;
   margin: 20px auto;
   overflow: hidden;
   border-radius: 34px;
@@ -30,66 +55,55 @@
   object-fit: cover;
 }
 
-/* overlay ครอบทั้ง hero */
 .overlay {
   position: absolute;
   inset: 0;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;   /* ชิดซ้าย */
-  justify-content: flex-start; /* ชิดบน */
-  padding: 80px 100px;        /* ขยับลงมาและเว้นจากซ้าย */
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 80px 100px;
   text-align: left;
   color: white;
 }
+.subtitle { font-size: 24px; font-weight: 400; margin-bottom: 5px; }
+.title    { font-size: 65px; font-weight: 700; margin: 0; line-height: 1.2; }
 
-/* subtitle */
-.subtitle {
-  font-size: 24px;    /* เดิมอาจจะ 18-20px → เพิ่มขึ้น */
-  font-weight: 400;
-  margin-bottom: 5px;
-}
-
-.title {
-  font-size: 65px;    /* เดิมอาจจะ 36-42px → เพิ่มขึ้น */
-  font-weight: 700;
-  margin: 0;
-  line-height: 1.2;   /* ลดช่องว่างบรรทัดลง */
-}
-
-.overlay-buttons {
+/* ----- Tabs ----- */
+.overlay-buttons{
   position: absolute;
   bottom: 0;
   left: 0;
-  margin-left: 30px; /* ขยับจากซ้าย */
+  margin-left: 30px;
   display: flex;
+  gap: 0; /* ชิดกันแบบ pills */
 }
 
-
-.overlay-buttons button {
+.tab-link{
   padding: 12px 24px;
-  border: none;
-  border-radius: 0;   /* เอามุมโค้งออก */
-  background: white;
-  color: black;
+  text-decoration: none;
+  border: 1px solid rgba(255,255,255,.45);
+  background: rgba(15,23,42,.45);   /* เทาเข้มโปร่งใสสำหรับปุ่มทั่วไป */
+  color: #fff;
   font-size: 16px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
+  backdrop-filter: blur(2px);
+  transition: background .15s ease, color .15s ease, box-shadow .15s ease;
+}
+.tab-link:hover{
+  background: rgba(15,23,42,.6);
 }
 
-/* ปุ่ม hover */
-.overlay-buttons button:hover {
-  background: #e5e5e5;
-}
+/* มุมโค้งเฉพาะซ้าย/ขวา */
+.tab-link:first-child{ border-top-left-radius: 10px; }
+.tab-link:last-child { border-top-right-radius: 10px; }
 
-/* ปุ่มแรกให้มุมบนซ้ายโค้ง */
-.overlay-buttons button:first-child {
-  border-top-left-radius: 10px;
+/* ✅ ปุ่มที่ active = พื้นขาวเหมือนภาพ */
+.tab-link.active{
+  background: #ffffff;
+  color: #111827;
+  border-color: #ffffff;
+  box-shadow: 0 10px 22px rgba(0,0,0,.18);
 }
-
-/* ปุ่มสุดท้ายให้มุมบนขวาโค้ง */
-.overlay-buttons button:last-child {
-  border-top-right-radius: 10px;
-}
-
 </style>
