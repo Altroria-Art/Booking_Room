@@ -1,31 +1,58 @@
-<script setup lang="ts">
-import { RouterLink } from 'vue-router'
+<script setup>
+import { useRouter, useRoute } from 'vue-router'
+import { computed } from 'vue'
+import { useAuthStore } from '@/store/auth'
 
-const props = defineProps<{
-  // ปลายทางเมื่อกดโลโก้: รับเป็น path หรือ route object ก็ได้
-  homeTo?: string | Record<string, any>
-}>()
+const auth = useAuthStore()
+const router = useRouter()
+const route = useRoute()
 
-const homeTo = props.homeTo ?? '/';  // ค่าเริ่มต้นคือหน้า user
+function logout() {
+  auth.clear()
+  router.replace({ name: 'login' })
+}
+
+const menu = [
+  { name: 'Dashboard', to: { name: 'admin.dashboard' }, key: 'dashboard' },
+  // ถ้ามีหน้าอื่นค่อยเติมเพิ่ม เช่น รายการจองทั้งหมด, จัดการห้อง, จัดการผู้ใช้ ฯลฯ
+]
+
+const activeName = computed(() => route.name)
 </script>
 
-<!-- src/components/MainNavbar.vue -->
 <template>
-  <header class="nav">
-    <div class="nav-wrap">
-      <!-- ใช้ :to แทน to ตายตัว -->
-      <RouterLink class="brand" :to="homeTo">
-        <span class="brand-main">STUDYROOM</span>
-        <span class="brand-accent">UP</span>
-      </RouterLink>
+  <header class="w-full border-b bg-white/80 backdrop-blur">
+    <div class="mx-auto max-w-6xl flex items-center gap-4 px-4 py-3">
+      <router-link to="/admin" class="font-semibold text-lg">Admin • Booking Room</router-link>
 
-      <nav class="nav-links">
-        <RouterLink to="#" class="link">Profile</RouterLink>
-        <RouterLink to="#" class="link">Logout</RouterLink>
+      <nav class="flex items-center gap-3">
+        <router-link
+          v-for="m in menu" :key="m.key"
+          :to="m.to"
+          class="px-3 py-1 rounded hover:bg-gray-100"
+          :class="{'bg-gray-100 font-medium': activeName===m.to.name}"
+        >{{ m.name }}</router-link>
       </nav>
+
+      <div class="ml-auto flex items-center gap-3">
+        <template v-if="auth.isLoggedIn">
+          <span class="text-sm text-gray-700">
+            <strong>{{ auth.displayName }}</strong>
+            <span v-if="auth.studentId" class="opacity-70"> ({{ auth.studentId }})</span>
+          </span>
+          <span class="text-xs px-2 py-0.5 rounded bg-indigo-100 text-indigo-700">ADMIN</span>
+
+          <router-link class="text-sm px-2 py-1 rounded hover:bg-gray-50"
+                       :to="{ name: 'user.rooms' }">ไปหน้า User</router-link>
+
+          <button class="text-sm px-3 py-1 rounded border hover:bg-gray-50"
+                  @click="logout">ออกจากระบบ</button>
+        </template>
+      </div>
     </div>
   </header>
 </template>
+
 
 
 <style scoped>

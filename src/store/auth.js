@@ -1,22 +1,31 @@
+// src/stores/auth.js
 import { defineStore } from 'pinia'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
-    token: null,
-    role: null
+    user: JSON.parse(localStorage.getItem('user') || 'null'),
+    token: localStorage.getItem('token') || null,
   }),
-  getters: {
-    isLoggedIn: (s) => !!s.token
-  },
+getters: {
+  isLoggedIn: (s) => !!s.user,
+  displayName: (s) => s.user?.display_name || '',
+  studentId: (s) => s.user?.student_id || '',
+  roleUpper: (s) => (s.user?.role || 'USER').toUpperCase(),
+  isAdmin:  (s) => (s.user?.role || '').toUpperCase() === 'ADMIN',
+},
+
   actions: {
-    // ฟังก์ชันจำลองล็อกอิน (ใช้เทส flow ได้เลย)
-    async mockLogin(role = 'user') {
-      this.token = 'mock-token'
-      this.role = role
+    setSession({ user, token }) {
+      this.user = user
+      this.token = token
+      localStorage.setItem('user', JSON.stringify(user))
+      localStorage.setItem('token', token)
     },
-    logout() {
+    clear() {
+      this.user = null
       this.token = null
-      this.role = null
+      localStorage.removeItem('user')
+      localStorage.removeItem('token')
     }
   }
 })

@@ -1,26 +1,63 @@
 <script setup>
-import { RouterLink } from 'vue-router'
+import { computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import { useAuthStore } from '@/store/auth'
+
+const auth = useAuthStore()
+const router = useRouter()
+const route = useRoute()
+
+function logout() {
+  auth.clear()
+  router.replace({ name: 'login' })
+}
+
+const menu = [
+  { name: 'ห้องทั้งหมด', to: { name: 'user.rooms' }, key: 'rooms' },
+  { name: 'รายการจองของฉัน', to: { name: 'user.review' }, key: 'review' }
+]
+
+const activeName = computed(() => route.name)
 </script>
 
-<!-- src/components/MainNavbar.vue -->
 <template>
-  <header class="nav">
-    <div class="nav-wrap">
-      <!-- logo -->
-      <RouterLink class="brand" to="/">
-        <span class="brand-main">STUDYROOM</span>
-        <span class="brand-accent">UP</span>
-      </RouterLink>
+  <header class="w-full border-b bg-white/80 backdrop-blur">
+    <div class="mx-auto max-w-6xl flex items-center gap-4 px-4 py-3">
+      <router-link to="/" class="font-semibold text-lg">Booking Room</router-link>
 
-      <!-- right links (เหลือเฉพาะ Profile / Logout) -->
-      <nav class="nav-links">
-        <RouterLink to="#" class="link">Profile</RouterLink>
-        <RouterLink to="#" class="link">Logout</RouterLink>
+      <nav class="flex items-center gap-3">
+        <router-link
+          v-for="m in menu" :key="m.key"
+          :to="m.to"
+          class="px-3 py-1 rounded hover:bg-gray-100"
+          :class="{'bg-gray-100 font-medium': activeName===m.to.name}"
+        >{{ m.name }}</router-link>
       </nav>
+
+      <div class="ml-auto flex items-center gap-3">
+        <template v-if="auth.isLoggedIn">
+          <span class="text-sm text-gray-700">
+            สวัสดี, <strong>{{ auth.displayName }}</strong>
+            <span v-if="auth.studentId"> ({{ auth.studentId }})</span>
+          </span>
+          <span class="text-xs px-2 py-0.5 rounded bg-emerald-100 text-emerald-700"
+                v-if="!auth.isAdmin">USER</span>
+          <router-link v-if="auth.isAdmin"
+                       class="text-xs px-2 py-0.5 rounded bg-indigo-100 text-indigo-700"
+                       :to="{ name: 'admin.dashboard' }">ADMIN</router-link>
+
+          <button class="text-sm px-3 py-1 rounded border hover:bg-gray-50"
+                  @click="logout">ออกจากระบบ</button>
+        </template>
+        <template v-else>
+          <router-link class="text-sm px-3 py-1 rounded border hover:bg-gray-50" to="/login">
+            เข้าสู่ระบบ
+          </router-link>
+        </template>
+      </div>
     </div>
   </header>
 </template>
-
 
 <style scoped>
 /* แถบ navbar */
