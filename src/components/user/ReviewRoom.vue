@@ -1,4 +1,8 @@
 <script setup>
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'   // ✅ ใช้เช็คเส้นทางปัจจุบัน
+
+// ---- เดิมของเธอ ----
 // ถ้าอยากทำ dynamic จาก API หรือ database ก็สามารถเปลี่ยนเป็น props / fetch ได้
 const reviews = [
   {
@@ -42,11 +46,18 @@ const defaultAvatar =
   `)
 
 // ใช้กำหนด src รูป: ถ้ามี r.avatar -> ใช้อันนั้น, ถ้าไม่มีให้ fallback เป็น defaultAvatar
-const srcOrDefault = (src) => src && src.trim() ? src : defaultAvatar
+const srcOrDefault = (src) => (src && src.trim() ? src : defaultAvatar)
+
+// ✅ เช็คว่าอยู่หน้ารีวิวหรือไม่ (/review หรือ path ลูกของมัน)
+const route = useRoute()
+const isReviewPage = computed(() =>
+  route.path === '/review' || route.path.startsWith('/review/')
+)
 </script>
 
 <template>
-  <section class="wrap">
+  <!-- ✅ ซ่อนทั้งก้อนเมื่ออยู่หน้า /review -->
+  <section v-if="!isReviewPage" class="wrap">
     <!-- หัวข้อ -->
     <div class="review-title">
       <span class="bar"></span>
@@ -72,7 +83,6 @@ const srcOrDefault = (src) => src && src.trim() ? src : defaultAvatar
         <!-- ผู้รีวิว (ชิดล่าง) -->
         <div class="reviewer">
           <div class="avatar">
-            <!-- แสดงรูป ถ้ามี; ถ้าโหลดไม่ได้ ให้ fallback เป็น defaultAvatar -->
             <img
               :src="srcOrDefault(r.avatar)"
               alt="profile"
@@ -129,85 +139,37 @@ const srcOrDefault = (src) => src && src.trim() ? src : defaultAvatar
     inset 0 1px 0 rgba(255,255,255,.12);
   padding: 18px 20px;
   transition: transform .15s ease, box-shadow .15s ease;
-
-  /* 👇 เพิ่มตรงนี้ให้เนื้อหาเรียงบนลงล่าง */
   display: flex;
   flex-direction: column;
-  justify-content: space-between; /* ดัน reviewer ลงล่างสุด */
-  min-height: 220px; /* ความสูงการ์ดพื้นฐาน (ปรับได้) */
+  justify-content: space-between;
+  min-height: 220px;
 }
 
 /* ดาวแบบวงกลม */
-.stars{
-  display:flex;
-  gap:14px;
-  margin-bottom:12px;
-}
+.stars{ display:flex; gap:14px; margin-bottom:12px; }
 .star{
-  width:28px;
-  height:28px;
-  border-radius:50%;
-  display:grid;
-  place-items:center;
-  background:#373a4a;
-  color:#ffd84d;
-  font-size:16px;
-  line-height:1;
+  width:28px; height:28px; border-radius:50%;
+  display:grid; place-items:center;
+  background:#373a4a; color:#ffd84d; font-size:16px; line-height:1;
   box-shadow: inset 0 0 0 2px rgba(255,255,255,.06);
 }
-.star.empty{
-  background: rgba(255,255,255,.16);
-  color:#8fa0ff;
-}
+.star.empty{ background: rgba(255,255,255,.16); color:#8fa0ff; }
 
 /* เนื้อหารีวิว */
-.content {
-  font-size: 13px;
-  line-height: 1.55;
-  color: #e8edff;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-  white-space: normal;
-  margin-bottom: 12px; /* เว้นระยะก่อน reviewer */
-}
+.content { font-size: 13px; line-height: 1.55; color: #e8edff; word-wrap: break-word; overflow-wrap: break-word; white-space: normal; margin-bottom: 12px; }
 
 /* ผู้รีวิวชิดล่าง */
-.reviewer {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: auto;
-  padding-top: 10px;
-  border-top: 1px solid rgba(255,255,255,.1);
-}
+.reviewer { display:flex; align-items:center; gap:12px; margin-top:auto; padding-top:10px; border-top:1px solid rgba(255,255,255,.1); }
 
-/* กรอบ Avatar + รองรับรูป/ไอคอน */
-.avatar{
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  background: #fff;              /* พื้นหลังสีขาวเหมือนไอคอนตัวอย่าง */
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0,0,0,.15);
-}
-.avatar img{
-  width: 22px;                   /* ถ้าเป็น SVG icon จะดูพอดีในวงกลม */
-  height: 22px;
-  object-fit: cover;
-  display: block;
-}
+/* Avatar */
+.avatar{ width:34px; height:34px; border-radius:50%; background:#fff; display:grid; place-items:center; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,.15); }
+.avatar img{ width:22px; height:22px; object-fit:cover; display:block; }
 
-.name { font-weight: 700; color: #fff; }
-.code { font-size: 12px; color: #c7cffc; }
+.name { font-weight:700; color:#fff; }
+.code { font-size:12px; color:#c7cffc; }
 
 /* กริด */
-.review-grid {
-  display:grid;
-  grid-template-columns: repeat(4, minmax(240px, 1fr));
-  gap: 30px;
-}
+.review-grid { display:grid; grid-template-columns: repeat(4, minmax(240px, 1fr)); gap:30px; }
 @media (max-width:1280px){ .review-grid{ grid-template-columns: repeat(3,1fr);} }
 @media (max-width:992px){ .review-grid{ grid-template-columns: repeat(2,1fr);} }
 @media (max-width:640px){ .review-grid{ grid-template-columns: 1fr;} }
