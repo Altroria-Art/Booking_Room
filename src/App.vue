@@ -1,7 +1,7 @@
 <script setup>
-import MainNavbar from './components/shared/MainNavbar.vue'
+import MainNavbar from './components/user/MainNavbar.vue'
 import HeroSection from './components/user/HeroSection.vue'
-import BookingModal from './components/BookingModal.vue'
+import BookingModal from './components/user/BookingModal.vue'
 import { ref, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import ReviewRoom from './components/user/ReviewRoom.vue';

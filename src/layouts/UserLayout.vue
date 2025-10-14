@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import MainNavbar from '@/components/shared/MainNavbar.vue';
+import MainNavbar from '@/components/user/MainNavbar.vue';
 import HeroSection from '@/components/user/HeroSection.vue';
 import ReviewRoom from '@/components/user/ReviewRoom.vue';
 
