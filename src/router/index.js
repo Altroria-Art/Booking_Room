@@ -1,12 +1,8 @@
+// src/router/index.js
 import { createRouter, createWebHistory } from 'vue-router'
 import UserLayout from '@/layouts/UserLayout.vue'
 import AdminLayout from '@/layouts/AdminLayout.vue'
-
-// NOTE: ถ้าคุณเก็บ store ไว้ที่ `src/store/auth.js` ให้ใช้บรรทัดนี้
-import { useAuthStore } from '@/store/auth'
-
-// ถ้าเก็บไว้ที่ `src/stores/auth.js` ให้สลับมาใช้บรรทัดนี้แทน
-// import { useAuthStore } from '@/stores/auth'
+import { useAuthStore } from '@/store/auth' // ใช้ path นี้ตามโปรเจคคุณ
 
 const router = createRouter({
   history: createWebHistory(),
@@ -15,10 +11,9 @@ const router = createRouter({
     {
       path: '/',
       component: UserLayout,
-      // ให้ทั้ง USER/ADMIN เข้าตรงนี้ได้ (admin เข้ามาดูฝั่ง user ได้)
       meta: { requiresAuth: true, roles: ['USER', 'ADMIN'] },
       children: [
-        { path: '', redirect: { name: 'user.rooms' } }, // ใช้ Rooms เป็นหน้าแรก
+        { path: '', redirect: { name: 'user.rooms' } }, // หน้าแรกของ user
         {
           path: 'rooms',
           name: 'user.rooms',
@@ -36,13 +31,13 @@ const router = createRouter({
     {
       path: '/admin',
       component: AdminLayout,
-      // จำกัดเฉพาะ ADMIN เท่านั้น
-      meta: { requiresAuth: true, roles: ['ADMIN'] },
+      meta: { requiresAuth: true, roles: ['ADMIN'] }, // ใช้ตัวพิมพ์ใหญ่ให้ตรงกับ roleUpper
       children: [
+        { path: '', redirect: { name: 'admin.rooms' } }, // ไม่มี Dashboard → ชี้ไป rooms
         {
-          path: '',
-          name: 'admin.dashboard',
-          component: () => import('@/modules/admin/pages/Dashboard.vue')
+          path: 'rooms',
+          name: 'admin.rooms',
+          component: () => import('@/modules/admin/pages/Rooms.vue')
         }
       ]
     },
@@ -52,7 +47,7 @@ const router = createRouter({
       path: '/login',
       name: 'login',
       component: () => import('@/modules/auth/Login.vue'),
-      meta: { guestOnly: true } // ถ้า login แล้ว ไม่ควรอยู่หน้านี้
+      meta: { guestOnly: true }
     },
 
     // not found -> กลับหน้าแรก
@@ -62,16 +57,16 @@ const router = createRouter({
 
 /**
  * ---- Route Guard: ตรวจ token + บังคับ role ----
- * - รองรับ role จาก backend ที่ส่งมาเป็น 'USER'|'ADMIN'
- * - ถ้าคอนฟิกใน meta ใช้ตัวพิมพ์เล็ก/ใหญ่ปนกัน เราจะ normalize เป็น UPPERCASE
+ * - รองรับ role จาก backend เป็น 'USER'|'ADMIN'
+ * - normalize meta.roles เป็นตัวพิมพ์ใหญ่
  */
 router.beforeEach((to) => {
   const auth = useAuthStore()
 
-  // กันผู้ที่ล็อกอินแล้วไม่ให้ค้างที่ /login
+  // ถ้าล็อกอินแล้ว ไม่ให้ค้างที่ /login
   if (to.meta?.guestOnly && auth.isLoggedIn) {
     return auth.roleUpper === 'ADMIN'
-      ? { name: 'admin.dashboard' }
+      ? { name: 'admin.rooms' }
       : { name: 'user.rooms' }
   }
 
@@ -80,13 +75,13 @@ router.beforeEach((to) => {
     return { name: 'login', query: { redirect: to.fullPath } }
   }
 
-  // เช็คสิทธิ์ role (normalize เป็นตัวใหญ่)
+  // เช็คสิทธิ์ role
   if (to.meta?.roles && auth.isLoggedIn) {
     const allowed = to.meta.roles.map(r => String(r).toUpperCase())
-    const myRole = auth.roleUpper   // <— ต้องมี getter นี้ใน store
+    const myRole = auth.roleUpper
     if (!allowed.includes(myRole)) {
       return myRole === 'ADMIN'
-        ? { name: 'admin.dashboard' }
+        ? { name: 'admin.rooms' }
         : { name: 'user.rooms' }
     }
   }

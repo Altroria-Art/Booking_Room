@@ -1,3 +1,26 @@
+<script setup>
+import { ref, watch, defineProps, defineEmits } from 'vue'
+
+
+const props = defineProps({
+  open: Boolean
+})
+
+const emit = defineEmits(['update:open'])
+
+const rating = ref(5)
+const comment = ref('')
+
+const closeModal = () => {
+  emit('update:open', false)
+}
+
+const submitReview = () => {
+  alert('รีวิวถูกส่งแล้ว! (สามารถเชื่อม backend ทีหลัง)')
+  emit('update:open', false)
+}
+</script>
+
 <template>
   <div v-if="open" class="modal-overlay">
     <div class="modal-content">
@@ -18,28 +41,6 @@
     </div>
   </div>
 </template>
-
-<script setup>
-import { ref, watch, defineProps, defineEmits } from 'vue'
-
-const props = defineProps({
-  open: Boolean
-})
-
-const emit = defineEmits(['update:open'])
-
-const rating = ref(5)
-const comment = ref('')
-
-const closeModal = () => {
-  emit('update:open', false)
-}
-
-const submitReview = () => {
-  alert('รีวิวถูกส่งแล้ว! (สามารถเชื่อม backend ทีหลัง)')
-  emit('update:open', false)
-}
-</script>
 
 <style scoped>
 .modal-overlay {

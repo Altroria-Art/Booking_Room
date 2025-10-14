@@ -1,92 +1,6 @@
-<!-- src/pages/Review.vue -->
-<template>
-  <section class="review-wrap">
-    <!-- Header -->
-    <div class="header-row">
-      <div class="chip">
-        <span class="th">รีวิว</span>
-        <span class="en">Review</span>
-      </div>
-
-      <div class="header-actions">
-        <button class="write-btn" @click="showModal = true">แสดงความคิดเห็น</button>
-      </div>
-    </div>
-
-    <!-- Filter / Pills -->
-    <div class="filters">
-      <button
-        class="pill"
-        :class="{ active: selected === 'all' }"
-        @click="setFilter('all')"
-      >
-        ความคิดเห็นทั้งหมด ({{ totalCount }})
-      </button>
-
-      <button
-        v-for="n in [5,4,3,2,1]"
-        :key="n"
-        class="pill"
-        :class="{ active: selected === n }"
-        @click="setFilter(n)"
-      >
-        {{ n }} ดาว ({{ counts[n] || 0 }})
-      </button>
-    </div>
-
-    <!-- Review Cards -->
-    <div class="cards">
-      <div class="card" v-for="(rv, idx) in pagedReviews" :key="idx">
-        <div class="card-head">
-          <div class="avatar">{{ initials(rv.name) }}</div>
-          <div class="meta">
-            <div class="name">{{ rv.name }}</div>
-            <div class="date">{{ rv.date }}</div>
-          </div>
-          <div class="stars">
-            <span
-              v-for="i in 5"
-              :key="i"
-              :class="['star', { on: i <= rv.rating }]"
-              >★</span
-            >
-          </div>
-        </div>
-
-        <p class="text">
-          {{ rv.text }}
-        </p>
-      </div>
-
-      <!-- No data -->
-      <div v-if="pagedReviews.length === 0" class="empty">
-        ยังไม่มีความคิดเห็นในตัวกรองนี้
-      </div>
-    </div>
-
-    <!-- Pagination -->
-    <div class="pagination" v-if="pages > 1">
-      <button class="pg" :disabled="page===1" @click="page--">‹</button>
-      <button
-        class="pg"
-        v-for="p in pages"
-        :key="p"
-        :class="{ active: page === p }"
-        @click="page = p"
-      >
-        {{ p }}
-      </button>
-      <button class="pg" :disabled="page===pages" @click="page++">›</button>
-    </div>
-
-    <!-- Modal -->
-    <ReviewModal v-model:open="showModal" />
-  </section>
-</template>
-
 <script setup>
 import { ref, computed, watch } from 'vue'
-import ReviewModal from '../components/ReviewModal.vue'
+import ReviewModal from '@/components/user/ReviewModal.vue'
 
 /**
  * MOCK DATA — เปลี่ยนเป็นข้อมูลจาก API ได้ภายหลัง
@@ -173,7 +87,102 @@ const initials = (fullName) => {
   if (parts.length === 1) return parts[0][0] || 'ผ'
   return (parts[0][0] + (parts[1]?.[0] || '')).toUpperCase()
 }
+
+const { showComposer, showSummary } = defineProps({
+  // โชว์/ซ่อนปุ่ม + โมดอลเขียนความเห็น
+  showComposer: { type: Boolean, default: true },
+  // โชว์/ซ่อน "บล็อกพรีวิวด้านบน" (หัว 'ช่องแสดงความคิดเห็น' + การ์ด 4 ใบ)
+  showSummary:  { type: Boolean, default: true }
+})
 </script>
+
+<!-- src/pages/Review.vue -->
+<template>
+  <section class="review-wrap">
+    <!-- Header -->
+    <div class="header-row">
+      <div class="chip">
+        <span class="th">รีวิว</span>
+        <span class="en">Review</span>
+      </div>
+
+      <div class="header-actions" v-if="showComposer">
+        <button class="write-btn" @click="showModal = true">แสดงความคิดเห็น</button>
+      </div>
+    </div>
+
+    <!-- Filter / Pills -->
+    <div class="filters">
+      <button
+        class="pill"
+        :class="{ active: selected === 'all' }"
+        @click="setFilter('all')"
+      >
+        ความคิดเห็นทั้งหมด ({{ totalCount }})
+      </button>
+
+      <button
+        v-for="n in [5,4,3,2,1]"
+        :key="n"
+        class="pill"
+        :class="{ active: selected === n }"
+        @click="setFilter(n)"
+      >
+        {{ n }} ดาว ({{ counts[n] || 0 }})
+      </button>
+    </div>
+
+    <!-- Review Cards -->
+    <div class="cards">
+      <div class="card" v-for="(rv, idx) in pagedReviews" :key="idx">
+        <div class="card-head">
+          <div class="avatar">{{ initials(rv.name) }}</div>
+          <div class="meta">
+            <div class="name">{{ rv.name }}</div>
+            <div class="date">{{ rv.date }}</div>
+          </div>
+          <div class="stars">
+            <span
+              v-for="i in 5"
+              :key="i"
+              :class="['star', { on: i <= rv.rating }]"
+              >★</span
+            >
+          </div>
+        </div>
+
+        <p class="text">
+          {{ rv.text }}
+        </p>
+      </div>
+
+      <!-- No data -->
+      <div v-if="pagedReviews.length === 0" class="empty">
+        ยังไม่มีความคิดเห็นในตัวกรองนี้
+      </div>
+    </div>
+
+    <!-- Pagination -->
+    <div class="pagination" v-if="pages > 1">
+      <button class="pg" :disabled="page===1" @click="page--">‹</button>
+      <button
+        class="pg"
+        v-for="p in pages"
+        :key="p"
+        :class="{ active: page === p }"
+        @click="page = p"
+      >
+        {{ p }}
+      </button>
+      <button class="pg" :disabled="page===pages" @click="page++">›</button>
+    </div>
+
+    <!-- Modal -->
+    <ReviewModal v-if="showComposer" v-model:open="showModal" />
+  </section>
+</template>
+
+
 
 <style scoped>
 /* -------- Base / Container -------- */
