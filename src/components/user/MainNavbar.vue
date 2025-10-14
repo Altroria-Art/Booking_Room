@@ -12,47 +12,48 @@ function logout() {
   router.replace({ name: 'login' })
 }
 
-const menu = [
-  { name: 'ห้องทั้งหมด', to: { name: 'user.rooms' }, key: 'rooms' },
-  { name: 'รายการจองของฉัน', to: { name: 'user.review' }, key: 'review' }
-]
-
 const activeName = computed(() => route.name)
 </script>
 
 <template>
-  <header class="w-full border-b bg-white/80 backdrop-blur">
-    <div class="mx-auto max-w-6xl flex items-center gap-4 px-4 py-3">
-      <router-link to="/" class="font-semibold text-lg">Booking Room</router-link>
+  <header class="nav">
+    <div class="nav-wrap">
+      <!-- Brand -->
+      <router-link to="/" class="brand">
+        <span class="brand-main">Booking</span>
+        <span class="brand-accent">Room</span>
+      </router-link>
 
-      <nav class="flex items-center gap-3">
+      <!-- Links -->
+      <nav class="nav-links">
         <router-link
           v-for="m in menu" :key="m.key"
           :to="m.to"
-          class="px-3 py-1 rounded hover:bg-gray-100"
-          :class="{'bg-gray-100 font-medium': activeName===m.to.name}"
-        >{{ m.name }}</router-link>
+          class="link"
+          :class="{ 'router-link-active': activeName===m.to.name }"
+        >
+          {{ m.name }}
+        </router-link>
       </nav>
 
-      <div class="ml-auto flex items-center gap-3">
+      <!-- Right -->
+      <div class="nav-right">
         <template v-if="auth.isLoggedIn">
-          <span class="text-sm text-gray-700">
+          <span class="who">
             สวัสดี, <strong>{{ auth.displayName }}</strong>
             <span v-if="auth.studentId"> ({{ auth.studentId }})</span>
+            <span class="badge user" v-if="!auth.isAdmin">USER</span>
           </span>
-          <span class="text-xs px-2 py-0.5 rounded bg-emerald-100 text-emerald-700"
-                v-if="!auth.isAdmin">USER</span>
-          <router-link v-if="auth.isAdmin"
-                       class="text-xs px-2 py-0.5 rounded bg-indigo-100 text-indigo-700"
-                       :to="{ name: 'admin.dashboard' }">ADMIN</router-link>
 
-          <button class="text-sm px-3 py-1 rounded border hover:bg-gray-50"
-                  @click="logout">ออกจากระบบ</button>
-        </template>
-        <template v-else>
-          <router-link class="text-sm px-3 py-1 rounded border hover:bg-gray-50" to="/login">
-            เข้าสู่ระบบ
+          <router-link v-if="auth.isAdmin" class="badge admin" :to="{ name: 'admin.dashboard' }">
+            ADMIN
           </router-link>
+
+          <button class="btn" @click="logout">ออกจากระบบ</button>
+        </template>
+
+        <template v-else>
+          <router-link class="btn" to="/login">เข้าสู่ระบบ</router-link>
         </template>
       </div>
     </div>
@@ -61,70 +62,36 @@ const activeName = computed(() => route.name)
 
 <style scoped>
 /* แถบ navbar */
-.nav {
-  background: #ffffff;
-  margin: 0;
-  width: 100%;
-  box-shadow: 0 6px 18px rgba(0,0,0,.05);
-}
+.nav { background:#fff; margin:0; width:100%; box-shadow:0 6px 18px rgba(0,0,0,.05); }
 
 /* คอนเทนต์ด้านใน */
-.nav-wrap{
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 18px 22px;
-}
+.nav-wrap{ display:flex; align-items:center; justify-content:space-between; padding:18px 22px; gap:16px; max-width:1120px; margin:0 auto; }
 
 /* โลโก้ */
-.brand{
-  display: inline-flex;
-  gap: 8px;
-  text-decoration: none;
-  align-items: baseline;
-  letter-spacing: .5px;
-}
-.brand-main{
-  font-weight: 800;
-  color: #1f2d3d;
-  font-size: 22px;
-}
-.brand-accent{
-  font-weight: 900;
-  color: #5865f2;
-  font-size: 32px;
-  line-height: 1;
-}
+.brand{ display:inline-flex; gap:8px; text-decoration:none; align-items:baseline; letter-spacing:.5px; }
+.brand-main{ font-weight:800; color:#1f2d3d; font-size:22px; }
+.brand-accent{ font-weight:900; color:#5865f2; font-size:32px; line-height:1; }
 
-/* ลิงก์ขวา */
-.nav-links{
-  display: inline-flex;
-  align-items: center;
-  gap: 28px;
-}
-.link{
-  position: relative;
-  font-size: 14px;
-  color: #334155;
-  text-decoration: none;   /* ตัดเส้นใต้ทั้งหมด */
-  padding-bottom: 0;       /* ไม่เผื่อพื้นที่เส้นใต้ */
-}
-
-/* ปิด pseudo-element ทุกกรณี (กันพลาด) */
-.link::after,
-.link:hover::after,
-.link.router-link-active::after,
-.link.router-link-exact-active::after{
-  content: none !important;
-  display: none !important;
-}
-
-/* hover แค่เปลี่ยนสีตัวอักษรเล็กน้อย */
+/* ลิงก์เมนูซ้ายกลาง */
+.nav-links{ display:inline-flex; align-items:center; gap:22px; }
+.link{ position:relative; font-size:14px; color:#334155; text-decoration:none; padding:4px 0; }
 .link:hover{ color:#111827; }
+.link.router-link-active{ color:#111827; font-weight:600; }
 
-@media (max-width: 720px){
-  .brand-main{ font-size: 18px; }
-  .brand-accent{ font-size: 26px; }
-  .nav-links{ gap: 18px; }
+/* ด้านขวา */
+.nav-right{ display:inline-flex; align-items:center; gap:12px; }
+.who{ font-size:13px; color:#334155; }
+.badge{ font-size:11px; padding:2px 8px; border-radius:999px; margin-left:6px; text-decoration:none; }
+.badge.user{ background:#ecfdf5; color:#047857; }
+.badge.admin{ background:#eef2ff; color:#3730a3; }
+
+/* ปุ่ม */
+.btn{ font-size:13px; padding:6px 12px; border:1px solid #e5e7eb; border-radius:8px; background:#fff; cursor:pointer; }
+.btn:hover{ background:#f9fafb; }
+
+@media (max-width:720px){
+  .brand-main{ font-size:18px; }
+  .brand-accent{ font-size:26px; }
+  .nav-links{ gap:14px; }
 }
 </style>
