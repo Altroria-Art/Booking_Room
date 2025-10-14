@@ -12,4 +12,8 @@ import ReviewRoom from '@/components/user/ReviewRoom.vue';
     <ReviewRoom />
     <router-view />
   </div>
+  <div>
+      <button @click="showBooking = true">ยืนยันการจอง ➕</button>
+      <BookingModal v-model:open="showBooking" />
+    </div>
 </template>
