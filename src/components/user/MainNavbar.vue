@@ -1,3 +1,7 @@
+<script setup>
+import { RouterLink } from 'vue-router'
+</script>
+
 <!-- src/components/MainNavbar.vue -->
 <template>
   <header class="nav">
@@ -17,9 +21,6 @@
   </header>
 </template>
 
-<script setup>
-import { RouterLink } from 'vue-router'
-</script>
 
 <style scoped>
 /* แถบ navbar */

@@ -1,6 +1,6 @@
 <template>
   <div>
-    <MainNavbar_Admin />
+    <MainNavbar_Admin homeTo="/admin" />
     <HeroSectionAdmin />
     <main class="p-6">
       <router-view />
