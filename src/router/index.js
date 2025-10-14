@@ -68,25 +68,23 @@ const router = createRouter({
 router.beforeEach((to) => {
   const auth = useAuthStore()
 
-  // ถ้าล็อกอินแล้ว แต่ไปหน้า login ให้เด้งออก
+  // กันผู้ที่ล็อกอินแล้วไม่ให้ค้างที่ /login
   if (to.meta?.guestOnly && auth.isLoggedIn) {
     return auth.roleUpper === 'ADMIN'
       ? { name: 'admin.dashboard' }
       : { name: 'user.rooms' }
   }
 
-  // ต้องล็อกอิน?
+  // ต้องล็อกอิน
   if (to.meta?.requiresAuth && !auth.isLoggedIn) {
     return { name: 'login', query: { redirect: to.fullPath } }
   }
 
-  // เช็คสิทธิ์ role ถ้าหน้านั้นกำหนดไว้
+  // เช็คสิทธิ์ role (normalize เป็นตัวใหญ่)
   if (to.meta?.roles && auth.isLoggedIn) {
-    // แปลง roles ใน meta ให้เป็นตัวพิมพ์ใหญ่
     const allowed = to.meta.roles.map(r => String(r).toUpperCase())
-    const myRole = auth.roleUpper // เราจะไปเพิ่ม getter นี้ใน store
+    const myRole = auth.roleUpper   // <— ต้องมี getter นี้ใน store
     if (!allowed.includes(myRole)) {
-      // ถ้าไม่มีสิทธิ์: ส่งไปหน้าที่เหมาะกับ role ตัวเอง
       return myRole === 'ADMIN'
         ? { name: 'admin.dashboard' }
         : { name: 'user.rooms' }
