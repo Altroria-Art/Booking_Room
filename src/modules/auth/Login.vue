@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 
@@ -7,8 +7,14 @@ const router = useRouter()
 const route  = useRoute()
 const auth   = useAuthStore()
 
-// กรณี mock: dropdown role
+// mock: เลือกบทบาทจาก dropdown (default = USER)
 const role = ref('USER')
+
+// รองรับ hint จาก /?as=USER|ADMIN (มาจากหน้าเลือกบทบาท)
+onMounted(() => {
+  const hint = String(route.query.as || '').toUpperCase()
+  if (hint === 'ADMIN' || hint === 'USER') role.value = hint
+})
 
 function doLoginMock() {
   // จำลอง user object ให้เหมือน payload จาก backend
@@ -24,19 +30,21 @@ function doLoginMock() {
 
   auth.setSession({ user, token: 'mock-token' })
 
-  // กลับไปหน้าเดิมถ้ามี redirect
+  // ถ้ามี redirect มากับ query ให้ไปหน้านั้นก่อน
   const redirectTo = route.query.redirect
   if (redirectTo && typeof redirectTo === 'string') {
     return router.replace(redirectTo)
   }
-  // ไม่งั้นเด้งตาม role
-  if (auth.roleUpper === 'ADMIN') router.replace({ name: 'admin.dashboard' })
-  else router.replace({ name: 'user.rooms' })
+
+  // ไม่งั้นเด้งตาม role (อัปเดตแล้ว: admin.rooms / user.rooms)
+  if (auth.roleUpper === 'ADMIN') return router.replace({ name: 'admin.rooms' })
+  return router.replace({ name: 'user.rooms' })
 }
 </script>
 
 <template>
   <div>
+    <h1>เข้าสู่ระบบ (mock)</h1>
     <select v-model="role">
       <option value="USER">เข้าสู่ระบบในฐานะ User</option>
       <option value="ADMIN">เข้าสู่ระบบในฐานะ Admin</option>
