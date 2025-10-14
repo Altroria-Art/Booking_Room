@@ -1,99 +1,81 @@
-<script setup lang="ts">
-import { RouterLink } from 'vue-router'
+<script setup>
+import { useRouter, useRoute } from 'vue-router'
+import { computed } from 'vue'
+import { useAuthStore } from '@/store/auth'
 
-const props = defineProps<{
-  // ปลายทางเมื่อกดโลโก้: รับเป็น path หรือ route object ก็ได้
-  homeTo?: string | Record<string, any>
-}>()
+const auth = useAuthStore()
+const router = useRouter()
+const route = useRoute()
 
-const homeTo = props.homeTo ?? '/';  // ค่าเริ่มต้นคือหน้า user
+function logout() {
+  auth.clear()
+  router.replace({ name: 'login' })
+}
+const activeName = computed(() => route.name)
 </script>
 
-<!-- src/components/MainNavbar.vue -->
 <template>
   <header class="nav">
     <div class="nav-wrap">
-      <!-- ใช้ :to แทน to ตายตัว -->
-      <RouterLink class="brand" :to="homeTo">
-        <span class="brand-main">STUDYROOM</span>
-        <span class="brand-accent">UP</span>
-      </RouterLink>
+      <!-- Brand -->
+      <router-link to="/admin" class="brand">
+        <span class="brand-main">Admin</span>
+        <span class="brand-accent">• Booking Room</span>
+      </router-link>
 
+      <!-- Links -->
       <nav class="nav-links">
-        <RouterLink to="#" class="link">Profile</RouterLink>
-        <RouterLink to="#" class="link">Logout</RouterLink>
+        <router-link
+          v-for="m in menu" :key="m.key"
+          :to="m.to"
+          class="link"
+          :class="{ 'router-link-active': activeName===m.to.name }"
+        >
+          {{ m.name }}
+        </router-link>
       </nav>
+
+      <!-- Right -->
+      <div class="nav-right">
+        <template v-if="auth.isLoggedIn">
+          <span class="who">
+            <strong>{{ auth.displayName }}</strong>
+            <span v-if="auth.studentId" class="muted"> ({{ auth.studentId }})</span>
+            <span class="badge admin">ADMIN</span>
+          </span>
+
+          
+          <button class="btn" @click="logout">ออกจากระบบ</button>
+        </template>
+      </div>
     </div>
   </header>
 </template>
 
-
 <style scoped>
-/* แถบ navbar */
-.nav {
-  background: #ffffff;
-  margin: 0;
-  width: 100%;
-  box-shadow: 0 6px 18px rgba(0,0,0,.05);
-}
-
-/* คอนเทนต์ด้านใน */
-.nav-wrap{
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 18px 22px;
-}
-
-/* โลโก้ */
-.brand{
-  display: inline-flex;
-  gap: 8px;
-  text-decoration: none;
-  align-items: baseline;
-  letter-spacing: .5px;
-}
-.brand-main{
-  font-weight: 800;
-  color: #1f2d3d;
-  font-size: 22px;
-}
-.brand-accent{
-  font-weight: 900;
-  color: #5865f2;
-  font-size: 32px;
-  line-height: 1;
-}
-
-/* ลิงก์ขวา */
-.nav-links{
-  display: inline-flex;
-  align-items: center;
-  gap: 28px;
-}
-.link{
-  position: relative;
-  font-size: 14px;
-  color: #334155;
-  text-decoration: none;   /* ตัดเส้นใต้ทั้งหมด */
-  padding-bottom: 0;       /* ไม่เผื่อพื้นที่เส้นใต้ */
-}
-
-/* ปิด pseudo-element ทุกกรณี (กันพลาด) */
-.link::after,
-.link:hover::after,
-.link.router-link-active::after,
-.link.router-link-exact-active::after{
-  content: none !important;
-  display: none !important;
-}
-
-/* hover แค่เปลี่ยนสีตัวอักษรเล็กน้อย */
+/* ใช้กฏเดียวกับ User เพื่อให้หน้าตาตรงกัน */
+.nav { background:#fff; margin:0; width:100%; box-shadow:0 6px 18px rgba(0,0,0,.05); }
+.nav-wrap{ display:flex; align-items:center; justify-content:space-between; padding:18px 22px; gap:16px; max-width:1120px; margin:0 auto; }
+.brand{ display:inline-flex; gap:8px; text-decoration:none; align-items:baseline; letter-spacing:.5px; }
+.brand-main{ font-weight:800; color:#1f2d3d; font-size:22px; }
+.brand-accent{ font-weight:900; color:#5865f2; font-size:22px; line-height:1; } /* ให้ขนาดเข้ากับคำว่า Admin */
+.nav-links{ display:inline-flex; align-items:center; gap:22px; }
+.link{ position:relative; font-size:14px; color:#334155; text-decoration:none; padding:4px 0; }
 .link:hover{ color:#111827; }
+.link.router-link-active{ color:#111827; font-weight:600; }
 
-@media (max-width: 720px){
-  .brand-main{ font-size: 18px; }
-  .brand-accent{ font-size: 26px; }
-  .nav-links{ gap: 18px; }
+.nav-right{ display:inline-flex; align-items:center; gap:12px; }
+.who{ font-size:13px; color:#334155; }
+.who .muted{ opacity:.7; }
+.badge{ font-size:11px; padding:2px 8px; border-radius:999px; margin-left:6px; text-decoration:none; }
+.badge.admin{ background:#eef2ff; color:#3730a3; }
+
+.btn{ font-size:13px; padding:6px 12px; border:1px solid #e5e7eb; border-radius:8px; background:#fff; cursor:pointer; }
+.btn:hover{ background:#f9fafb; }
+
+@media (max-width:720px){
+  .brand-main{ font-size:18px; }
+  .brand-accent{ font-size:18px; }
+  .nav-links{ gap:14px; }
 }
 </style>

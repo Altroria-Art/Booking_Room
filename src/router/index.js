@@ -1,7 +1,8 @@
+// src/router/index.js
 import { createRouter, createWebHistory } from 'vue-router'
 import UserLayout from '@/layouts/UserLayout.vue'
 import AdminLayout from '@/layouts/AdminLayout.vue'
-import { useAuthStore } from '@/store/auth' // ต้องมีไฟล์นี้
+import { useAuthStore } from '@/store/auth' // ใช้ path นี้ตามโปรเจคคุณ
 
 const router = createRouter({
   history: createWebHistory(),
@@ -10,9 +11,9 @@ const router = createRouter({
     {
       path: '/',
       component: UserLayout,
-      meta: { requiresAuth: true, roles: ['user','admin'] },
+      meta: { requiresAuth: true, roles: ['USER', 'ADMIN'] },
       children: [
-        { path: '', redirect: { name: 'user.rooms' } }, // ใช้ Rooms เป็นหน้าแรก
+        { path: '', redirect: { name: 'user.rooms' } }, // หน้าแรกของ user
         {
           path: 'rooms',
           name: 'user.rooms',
@@ -30,13 +31,9 @@ const router = createRouter({
     {
       path: '/admin',
       component: AdminLayout,
-      meta: { requiresAuth: true, roles: ['admin'] },
-     children: [
-        {
-         path: '',
-         name: 'admin.dashboard',
-         component: () => import('@/modules/admin/pages/Dashboard.vue')
-        },
+      meta: { requiresAuth: true, roles: ['ADMIN'] }, // ใช้ตัวพิมพ์ใหญ่ให้ตรงกับ roleUpper
+      children: [
+        { path: '', redirect: { name: 'admin.rooms' } }, // ไม่มี Dashboard → ชี้ไป rooms
         {
           path: 'rooms',
           name: 'admin.rooms',
@@ -49,7 +46,8 @@ const router = createRouter({
     {
       path: '/login',
       name: 'login',
-      component: () => import('@/modules/auth/Login.vue')
+      component: () => import('@/modules/auth/Login.vue'),
+      meta: { guestOnly: true }
     },
 
     // not found -> กลับหน้าแรก
@@ -57,12 +55,35 @@ const router = createRouter({
   ]
 })
 
-// ---- Route Guard: login + role ----
+/**
+ * ---- Route Guard: ตรวจ token + บังคับ role ----
+ * - รองรับ role จาก backend เป็น 'USER'|'ADMIN'
+ * - normalize meta.roles เป็นตัวพิมพ์ใหญ่
+ */
 router.beforeEach((to) => {
   const auth = useAuthStore()
-  if (to.meta?.requiresAuth && !auth.isLoggedIn) return { name: 'login' }
-  if (to.meta?.roles && auth.role && !to.meta.roles.includes(auth.role)) {
-    return auth.role === 'admin' ? { name: 'admin.dashboard' } : { name: 'user.rooms' }
+
+  // ถ้าล็อกอินแล้ว ไม่ให้ค้างที่ /login
+  if (to.meta?.guestOnly && auth.isLoggedIn) {
+    return auth.roleUpper === 'ADMIN'
+      ? { name: 'admin.rooms' }
+      : { name: 'user.rooms' }
+  }
+
+  // ต้องล็อกอิน
+  if (to.meta?.requiresAuth && !auth.isLoggedIn) {
+    return { name: 'login', query: { redirect: to.fullPath } }
+  }
+
+  // เช็คสิทธิ์ role
+  if (to.meta?.roles && auth.isLoggedIn) {
+    const allowed = to.meta.roles.map(r => String(r).toUpperCase())
+    const myRole = auth.roleUpper
+    if (!allowed.includes(myRole)) {
+      return myRole === 'ADMIN'
+        ? { name: 'admin.rooms' }
+        : { name: 'user.rooms' }
+    }
   }
 })
 
