@@ -1,7 +1,15 @@
+<script setup>
+import { RouterLink, useRoute } from 'vue-router'
+const route = useRoute()
+const isActive = (name) => route.name === name
+</script>
+
 <template>
   <section class="hero">
-    <img class="hero-img" src="/src/img/image 9.svg" alt="hero">
+    <!-- รูปพื้นหลัง -->
+    <img class="hero-img" src="/src/img/image 9.svg" alt="hero" />
 
+    <!-- ข้อความซ้อนบนรูป -->
     <div class="overlay">
       <h2 class="subtitle">
         โปรแกรมจองห้อง ศูนย์บรรณสารและการเรียนรู้ สถาบันนวัตกรรมการเรียนรู้
@@ -9,30 +17,25 @@
       <h1 class="title">มหาวิทยาลัยพะเยา</h1>
     </div>
 
-    <!-- Tabs ใต้แบนเนอร์ -->
+    <!-- ปุ่ม -->
     <div class="overlay-buttons">
       <RouterLink
-        to="/"
+        :to="{ name: 'admin.rooms' }"
         class="tab-link"
-        :class="{ active: isActive('/') }"
-      >จองห้อง</RouterLink>
-
+        :class="{ active: isActive('admin.rooms') }"
+      >
+        จองห้อง
+      </RouterLink>
       <RouterLink
-        to="/review"
+        to="#"
         class="tab-link"
-        :class="{ active: isActive('/review') }"
-      >รีวิว</RouterLink>
+      >
+        รีวิว
+      </RouterLink>
     </div>
   </section>
 </template>
 
-<script setup>
-import { RouterLink, useRoute } from 'vue-router'
-
-const route = useRoute()
-// ให้ active เฉพาะ path ที่ตรงกันแบบ exact
-const isActive = (path) => route.path === path
-</script>
 
 <style scoped>
 .hero {

@@ -31,11 +31,16 @@ const router = createRouter({
       path: '/admin',
       component: AdminLayout,
       meta: { requiresAuth: true, roles: ['admin'] },
-      children: [
+     children: [
         {
-          path: '',
-          name: 'admin.dashboard',
-          component: () => import('@/modules/admin/pages/Dashboard.vue')
+         path: '',
+         name: 'admin.dashboard',
+         component: () => import('@/modules/admin/pages/Dashboard.vue')
+        },
+        {
+          path: 'rooms',
+          name: 'admin.rooms',
+          component: () => import('@/modules/admin/pages/Rooms.vue')
         }
       ]
     },
