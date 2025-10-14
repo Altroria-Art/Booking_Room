@@ -1,14 +1,24 @@
+<script setup lang="ts">
+import { RouterLink } from 'vue-router'
+
+const props = defineProps<{
+  // ปลายทางเมื่อกดโลโก้: รับเป็น path หรือ route object ก็ได้
+  homeTo?: string | Record<string, any>
+}>()
+
+const homeTo = props.homeTo ?? '/';  // ค่าเริ่มต้นคือหน้า user
+</script>
+
 <!-- src/components/MainNavbar.vue -->
 <template>
   <header class="nav">
     <div class="nav-wrap">
-      <!-- logo -->
-      <RouterLink class="brand" to="/">
+      <!-- ใช้ :to แทน to ตายตัว -->
+      <RouterLink class="brand" :to="homeTo">
         <span class="brand-main">STUDYROOM</span>
         <span class="brand-accent">UP</span>
       </RouterLink>
 
-      <!-- right links (เหลือเฉพาะ Profile / Logout) -->
       <nav class="nav-links">
         <RouterLink to="#" class="link">Profile</RouterLink>
         <RouterLink to="#" class="link">Logout</RouterLink>
@@ -17,9 +27,6 @@
   </header>
 </template>
 
-<script setup>
-import { RouterLink } from 'vue-router'
-</script>
 
 <style scoped>
 /* แถบ navbar */
