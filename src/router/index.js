@@ -9,17 +9,19 @@ const AdminLayout = () => import('../layouts/AdminLayout.vue')
 const AdminRooms  = () => import('../modules/admin/pages/Rooms.vue')
 
 // User
-const UserLayout = () => import('../layouts/UserLayout.vue')
-const UserRooms  = () => import('../modules/user/pages/Rooms.vue')
+const UserLayout  = () => import('../layouts/UserLayout.vue')
+const UserRooms   = () => import('../modules/user/pages/Rooms.vue')
+const UserReview  = () => import('../modules/user/pages/Review.vue')
+// ถ้ามีหน้า History จริง ให้ import แล้วเปลี่ยน component ของ route 'history' ด้านล่าง
+// const UserHistory = () => import('../modules/user/pages/History.vue')
 
 const routes = [
-  // เปิดมาที่ root ให้เด้งไป /login
+  // เริ่มที่ /login
   { path: '/', redirect: '/login' },
 
-  // หน้า Login (ตัวที่คุณใช้จริง)
   { path: '/login', name: 'login', component: Login },
 
-  // กลุ่มหน้า Admin
+  // Admin
   {
     path: '/admin',
     component: AdminLayout,
@@ -29,13 +31,23 @@ const routes = [
     ],
   },
 
-  // กลุ่มหน้า User
+  // User
   {
     path: '/user',
     component: UserLayout,
     children: [
       { path: '', redirect: { name: 'rooms' } },
-      { path: 'rooms', name: 'rooms', component: UserRooms },
+
+      // --- ชื่อ route "แบบเดิม" (rooms/review/history) ---
+      { path: 'rooms',   name: 'rooms',   component: UserRooms,  alias: ['/rooms'] },
+      { path: 'review',  name: 'review',  component: UserReview, alias: ['/review'] },
+      // ยังไม่มีหน้าหลักฐาน? ชี้ไป Rooms ชั่วคราว กัน 404
+      { path: 'history', name: 'history', component: UserRooms,  alias: ['/history'] },
+
+      // --- ชื่อ route "แบบมี prefix user.*" เพื่อความเข้ากันได้กับโค้ดที่เรียกชื่อนี้ ---
+      { path: 'rooms-compat',   name: 'user.rooms',   redirect: { name: 'rooms' } },
+      { path: 'review-compat',  name: 'user.review',  redirect: { name: 'review' } },
+      { path: 'history-compat', name: 'user.history', redirect: { name: 'history' } },
     ],
   },
 
@@ -47,14 +59,5 @@ const router = createRouter({
   history: createWebHistory(),
   routes,
 })
-
-// (ตัวเลือก) ถ้าจะบังคับให้ต้องล็อกอินก่อนเข้า /admin หรือ /user
-// router.beforeEach((to, from, next) => {
-//   const token = localStorage.getItem('token')
-//   const publicPages = ['/login']
-//   const authRequired = !publicPages.includes(to.path)
-//   if (authRequired && !token) return next('/login')
-//   next()
-// })
 
 export default router
