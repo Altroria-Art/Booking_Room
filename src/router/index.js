@@ -12,8 +12,8 @@ const AdminRooms  = () => import('../modules/admin/pages/Rooms.vue')
 const UserLayout  = () => import('../layouts/UserLayout.vue')
 const UserRooms   = () => import('../modules/user/pages/Rooms.vue')
 const UserReview  = () => import('../modules/user/pages/Review.vue')
-// ถ้ามีหน้า History จริง ให้เปลี่ยน component ตรงนี้
-const UserHistory = UserRooms  // TODO: แก้เป็นหน้า History จริงเมื่อพร้อม
+// TODO: ถ้ามีหน้า History จริง ให้เปลี่ยนจาก UserRooms เป็นไฟล์ของ History
+const UserHistory = UserRooms
 
 const routes = [
   // เริ่มที่ /login
@@ -37,14 +37,19 @@ const routes = [
     children: [
       { path: '', redirect: { name: 'user.rooms' } },
 
-      // ใช้ชื่อ route แบบมี prefix ชัดเจน
+      // ชื่อหลักที่แนะนำให้ใช้
       { path: 'rooms',   name: 'user.rooms',   component: UserRooms },
       { path: 'review',  name: 'user.review',  component: UserReview },
       { path: 'history', name: 'user.history', component: UserHistory },
+
+      // ✅ ชื่อเดิมเพื่อความเข้ากันได้กับโค้ดเก่า (push โดย name เดิม)
+      { path: 'rooms-compat',   name: 'rooms',   redirect: { name: 'user.rooms' } },
+      { path: 'review-compat',  name: 'review',  redirect: { name: 'user.review' } },
+      { path: 'history-compat', name: 'history', redirect: { name: 'user.history' } },
     ],
   },
 
-  // ===== เส้นทางสั้น (top-level) → redirect เข้า /user/... =====
+  // ===== เส้นทางสั้นระดับบน → redirect เข้า /user/...
   { path: '/rooms',   redirect: { name: 'user.rooms' } },
   { path: '/review',  redirect: { name: 'user.review' } },
   { path: '/history', redirect: { name: 'user.history' } },
