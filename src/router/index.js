@@ -1,90 +1,78 @@
-// src/router/index.js
 import { createRouter, createWebHistory } from 'vue-router'
-import UserLayout from '@/layouts/UserLayout.vue'
-import AdminLayout from '@/layouts/AdminLayout.vue'
-import { useAuthStore } from '@/store/auth' // ใช้ path นี้ตามโปรเจคคุณ
+import { useAuthStore } from '@/store/auth'   // ⬅ เพิ่มเพื่อใช้ใน guard
+
+// Layouts
+const UserLayout  = () => import('@/layouts/UserLayout.vue')
+const AdminLayout = () => import('@/layouts/AdminLayout.vue')
+
+// Auth
+const Login = () => import('@/modules/auth/Login.vue')
+
+// User pages (อยู่ใน src/modules/user/pages)
+const UserRooms  = () => import('@/modules/user/pages/Rooms.vue')
+const UserReview = () => import('@/modules/user/pages/Review.vue')
+
+// Admin pages (อยู่ใน src/modules/admin/pages)
+const AdminDashboard = () => import('@/modules/admin/pages/Dashboard.vue')
+const AdminRooms     = () => import('@/modules/admin/pages/Rooms.vue')
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
-    // ----- USER ZONE -----
+    // ----- Public/Auth -----
+    { path: '/login', name: 'login', component: Login },
+
+    // ----- User Area (มี layout) -----
     {
       path: '/',
       component: UserLayout,
-      meta: { requiresAuth: true, roles: ['USER', 'ADMIN'] },
       children: [
-        { path: '', redirect: { name: 'user.rooms' } }, // หน้าแรกของ user
-        {
-          path: 'rooms',
-          name: 'user.rooms',
-          component: () => import('@/modules/user/pages/Rooms.vue')
-        },
-        {
-          path: 'review',
-          name: 'user.review',
-          component: () => import('@/modules/user/pages/Review.vue')
-        }
-      ]
+        // หน้าแรกให้ไปหน้า Rooms ของ user เลย
+        { path: '',        name: 'home',   component: UserRooms },
+        { path: 'rooms',   name: 'rooms',  component: UserRooms },
+        { path: 'review',  name: 'review', component: UserReview },
+      ],
     },
 
-    // ----- ADMIN ZONE -----
+    // ----- Admin Area (มี layout) -----
     {
       path: '/admin',
       component: AdminLayout,
-      meta: { requiresAuth: true, roles: ['ADMIN'] }, // ใช้ตัวพิมพ์ใหญ่ให้ตรงกับ roleUpper
       children: [
-        { path: '', redirect: { name: 'admin.rooms' } }, // ไม่มี Dashboard → ชี้ไป rooms
-        {
-          path: 'rooms',
-          name: 'admin.rooms',
-          component: () => import('@/modules/admin/pages/Rooms.vue')
-        }
-      ]
+        // ✅ ใส่ชื่อ admin.dashboard ให้ตรงกับลิงก์เดิม ๆ
+        { path: '',        name: 'admin.dashboard', component: AdminDashboard },
+        { path: 'rooms',   name: 'admin.rooms',     component: AdminRooms },
+      ],
     },
 
-    // ----- AUTH -----
-    {
-      path: '/login',
-      name: 'login',
-      component: () => import('@/modules/auth/Login.vue'),
-      meta: { guestOnly: true }
-    },
-
-    // not found -> กลับหน้าแรก
-    { path: '/:pathMatch(.*)*', redirect: '/' }
-  ]
+    // ----- 404 -----
+    { path: '/:pathMatch(.*)*', name: 'notfound', component: { template: '<div style="padding:20px">Not Found</div>' } },
+  ],
 })
 
-/**
- * ---- Route Guard: ตรวจ token + บังคับ role ----
- * - รองรับ role จาก backend เป็น 'USER'|'ADMIN'
- * - normalize meta.roles เป็นตัวพิมพ์ใหญ่
- */
+/* =========================
+   ✅ Global Auth Guard
+   - ถ้ายังไม่ล็อกอิน → บังคับไป /login
+   - ถ้าล็อกอินแล้ว แต่ไป /login → เด้งไปหน้าตาม role
+   - รองรับ redirect กลับไปหน้าที่ตั้งใจเข้าทีหลัง
+   ========================= */
+const PUBLIC = new Set(['login'])
+
 router.beforeEach((to) => {
   const auth = useAuthStore()
+  const loggedIn = !!auth?.isLoggedIn
 
-  // ถ้าล็อกอินแล้ว ไม่ให้ค้างที่ /login
-  if (to.meta?.guestOnly && auth.isLoggedIn) {
-    return auth.roleUpper === 'ADMIN'
-      ? { name: 'admin.rooms' }
-      : { name: 'user.rooms' }
-  }
-
-  // ต้องล็อกอิน
-  if (to.meta?.requiresAuth && !auth.isLoggedIn) {
+  // ยังไม่ล็อกอินและหน้าไม่ใช่ public -> ไป login
+  if (!loggedIn && !PUBLIC.has(to.name)) {
     return { name: 'login', query: { redirect: to.fullPath } }
   }
 
-  // เช็คสิทธิ์ role
-  if (to.meta?.roles && auth.isLoggedIn) {
-    const allowed = to.meta.roles.map(r => String(r).toUpperCase())
-    const myRole = auth.roleUpper
-    if (!allowed.includes(myRole)) {
-      return myRole === 'ADMIN'
-        ? { name: 'admin.rooms' }
-        : { name: 'user.rooms' }
-    }
+  // ล็อกอินแล้วแต่จะไปหน้า login -> เด้งตาม role
+  if (loggedIn && to.name === 'login') {
+    return auth.isAdmin ? { name: 'admin.dashboard' } : { name: 'rooms' }
   }
+
+  return true
 })
 
 export default router
