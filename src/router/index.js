@@ -13,7 +13,6 @@ const UserRooms  = () => import('@/modules/user/pages/Rooms.vue')
 const UserReview = () => import('@/modules/user/pages/Review.vue')
 
 // Admin pages (อยู่ใน src/modules/admin/pages)
-const AdminDashboard = () => import('@/modules/admin/pages/Dashboard.vue')
 const AdminRooms     = () => import('@/modules/admin/pages/Rooms.vue')
 
 const router = createRouter({
@@ -39,12 +38,6 @@ const router = createRouter({
       path: '/admin',
       component: AdminLayout,
       children: [
-        // ✅ ใส่ชื่อ admin.dashboard ให้ตรงกับลิงก์เดิม ๆ
-        // { path: '',        
-        //   name: 'admin.dashboard', 
-        //   component: AdminDashboard },
-         // ✅ เมื่อเข้าที่ /admin ให้ redirect ไป /admin/rooms ทันที
-
         // ✅ หน้า “จองห้อง (Admin)” เป็นหน้าหลัก
         { path: '', redirect: { name: 'admin.rooms' } },
 
