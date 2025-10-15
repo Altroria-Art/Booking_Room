@@ -1,53 +1,29 @@
 <script setup>
-import { useRouter, useRoute } from 'vue-router'
-import { computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 
-const auth = useAuthStore()
 const router = useRouter()
-const route = useRoute()
+const auth = useAuthStore()
 
 function logout() {
   auth.clear()
   router.replace({ name: 'login' })
 }
-
-// ✅ เมนูเหลือหน้าเดียวคือห้องจอง
-const menu = [
-  { key: 'rooms', name: 'Admin Library', to: { name: 'admin.rooms' } },
-]
-
-const activeName = computed(() => route.name)
 </script>
 
 <template>
   <header class="nav">
     <div class="nav-wrap">
-      <!-- Brand -->
-      <router-link to="{ name: 'admin.rooms' }" class="brand">
+      <!-- โลโก้: คลิกแล้วไปหน้า /admin/rooms -->
+      <router-link :to="{ name: 'admin.rooms' }" class="brand" aria-label="Go to Admin rooms">
         <span class="brand-main">Admin</span>
-        <span class="brand-accent">• Booking Room</span>
+        <span class="brand-dot">•</span>
+        <span class="brand-accent">Booking Room</span>
       </router-link>
 
-      <!-- Links -->
-      <nav class="nav-links">
-        <router-link
-          v-for="m in menu" :key="m.key"
-          :to="m.to"
-          class="link"
-          :class="{ active: activeName === m.to.name }"
-        >
-          {{ m.name }}
-        </router-link>
-      </nav>
-
-      <!-- Right -->
+      <!-- ด้านขวา -->
       <div class="nav-right" v-if="auth.isLoggedIn">
-        <span class="who">
-          <strong>{{ auth.displayName }}</strong>
-          <span v-if="auth.studentId" class="muted">({{ auth.studentId }})</span>
-          <span class="badge admin">ADMIN</span>
-        </span>
+        <span class="badge admin">ADMIN</span>
         <button class="btn" @click="logout">ออกจากระบบ</button>
       </div>
     </div>
