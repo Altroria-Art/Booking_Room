@@ -1,41 +1,16 @@
 <script setup>
 import { computed } from 'vue'
-import { useRoute } from 'vue-router'   // ✅ ใช้เช็คเส้นทางปัจจุบัน
+import { useRoute } from 'vue-router'
 
-// ---- เดิมของเธอ ----
-// ถ้าอยากทำ dynamic จาก API หรือ database ก็สามารถเปลี่ยนเป็น props / fetch ได้
+// --- ข้อมูลตัวอย่าง (เหมือนเดิม) ---
 const reviews = [
-  {
-    stars: 4,
-    text: "ห้องสะอาด บรรยากาศดี เหมาะกับการอ่านหนังสือมากๆ อุปกรณ์ครบถ้วน ใช้งานง่าย สะดวกต่อการจอง",
-    name: "ธนพร แสนคำ",
-    code: "67025044",
-    avatar: "/img/avatar1.jpg"
-  },
-  {
-    stars: 5,
-    text: "ห้องสะอาดและเก็บเสียงดีมากๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆ",
-    name: "ธนพร แสนคำ",
-    code: "67025044",
-    avatar: "/img/avatar2.jpg"
-  },
-  {
-    stars: 5,
-    text: "ห้องดีมาก มีพื้นที่กว้างสะดวก ห้องเย็นสบาย",
-    name: "ธนพร แสนคำ",
-    code: "67025044",
-    avatar: "/img/avatar3.jpg"
-  },
-  {
-    stars: 4,
-    text: "very good mak mak",
-    name: "สมพล หยอดย้อย",
-    code: "67022928",
-    avatar: "" // ทิ้งว่างไว้เพื่อเทส fallback เป็นไอคอน
-  }
+  { stars: 4, text: "ห้องสะอาด บรรยากาศดี เหมาะกับการอ่านหนังสือมากๆ อุปกรณ์ครบถ้วน ใช้งานง่าย สะดวกต่อการจอง", name: "ธนพร แสนคำ", code: "67025044", avatar: "/img/avatar1.jpg" },
+  { stars: 5, text: "ห้องสะอาดและเก็บเสียงดีมากๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆๆ", name: "ธนพร แสนคำ", code: "67025044", avatar: "/img/avatar2.jpg" },
+  { stars: 5, text: "ห้องดีมาก มีพื้นที่กว้างสะดวก ห้องเย็นสบาย", name: "ธนพร แสนคำ", code: "67025044", avatar: "/img/avatar3.jpg" },
+  { stars: 4, text: "very good mak mak", name: "สมพล หยอดย้อย", code: "67022928", avatar: "" }
 ]
 
-// ไอคอนโปรไฟล์แบบ SVG (data URI) ใช้เป็นค่าเริ่มต้น / เวลารูปโหลดไม่สำเร็จ
+// ไอคอนโปรไฟล์ fallback
 const defaultAvatar =
   'data:image/svg+xml;utf8,' +
   encodeURIComponent(`
@@ -45,18 +20,20 @@ const defaultAvatar =
     </svg>
   `)
 
-// ใช้กำหนด src รูป: ถ้ามี r.avatar -> ใช้อันนั้น, ถ้าไม่มีให้ fallback เป็น defaultAvatar
 const srcOrDefault = (src) => (src && src.trim() ? src : defaultAvatar)
 
-// ✅ เช็คว่าอยู่หน้ารีวิวหรือไม่ (/review หรือ path ลูกของมัน)
+// ✅ ซ่อนคอมโพเนนต์เมื่ออยู่หน้ารีวิว (ครอบคลุม path และ name)
 const route = useRoute()
-const isReviewPage = computed(() =>
-  route.path === '/review' || route.path.startsWith('/review/')
-)
+const isReviewPage = computed(() => {
+  const p = (route.path || '').toLowerCase()
+  const n = (route.name ? String(route.name) : '').toLowerCase()
+  // จับทั้ง /review, /user/review, /xxx/review/123 และชื่อ route ที่มีคำว่า review
+  return /(^|\/)review(\/|$)/.test(p) || /review/.test(n)
+})
 </script>
 
 <template>
-  <!-- ✅ ซ่อนทั้งก้อนเมื่ออยู่หน้า /review -->
+  <!-- ซ่อนทั้งก้อนเมื่ออยู่หน้ารีวิว -->
   <section v-if="!isReviewPage" class="wrap">
     <!-- หัวข้อ -->
     <div class="review-title">
@@ -65,9 +42,9 @@ const isReviewPage = computed(() =>
     </div>
     <h3 class="subtitle">ช่องแสดงความคิดเห็น</h3>
 
-    <!-- ปุ่ม -->
+    <!-- ปุ่มไปหน้ารีวิวทั้งหมด -->
     <div style="display:flex; justify-content:flex-end; margin: 8px 0 20px;">
-      <button class="review-cta">ความคิดเห็นทั้งหมด</button>
+      <RouterLink :to="{ name: 'user.review' }" class="review-cta">ความคิดเห็นทั้งหมด</RouterLink>
     </div>
 
     <!-- กริดการ์ด -->
@@ -80,7 +57,6 @@ const isReviewPage = computed(() =>
 
         <p class="content">{{ r.text }}</p>
 
-        <!-- ผู้รีวิว (ชิดล่าง) -->
         <div class="reviewer">
           <div class="avatar">
             <img
@@ -101,12 +77,7 @@ const isReviewPage = computed(() =>
 
 <style scoped>
 /* section title */
-.review-title {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 8px 0 12px;
-}
+.review-title { display:flex; align-items:center; gap:12px; margin:8px 0 12px; }
 .review-title .bar { width:4px; height:28px; background:#5b6ef5; border-radius:2px; }
 .review-title h2 { margin:0; font-size:28px; color:#374151; font-weight:800; }
 .review-title .hl { color:#5b6ef5; }
@@ -114,49 +85,34 @@ const isReviewPage = computed(() =>
 
 /* ปุ่ม “ความคิดเห็นทั้งหมด” */
 .review-cta {
-  background: #eef2ff;
-  color: #1e40af;
-  border: 1px solid #c7d2fe;
-  padding: 10px 16px;
-  border-radius: 14px;
-  box-shadow: 0 8px 24px rgba(91,110,245,.20);
-  transition: transform .15s ease, box-shadow .15s ease;
-  white-space: nowrap;
+  background:#eef2ff; color:#1e40af; border:1px solid #c7d2fe;
+  padding:10px 16px; border-radius:14px;
+  box-shadow:0 8px 24px rgba(91,110,245,.20);
+  transition:transform .15s ease, box-shadow .15s ease; white-space:nowrap;
+  text-decoration:none;
 }
-.review-cta:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 12px 28px rgba(91,110,245,.28);
-}
+.review-cta:hover { transform:translateY(-1px); box-shadow:0 12px 28px rgba(91,110,245,.28); }
 
 /* การ์ดรีวิว */
 .review-card {
-  background: linear-gradient(180deg,#5b6ef5 0%, #4f5bd4 100%);
-  border: 1px solid rgba(255,255,255,.14);
-  border-radius: 14px;
-  color: #eef2ff;
-  box-shadow:
-    0 8px 22px rgba(41,53,170,.26),
-    inset 0 1px 0 rgba(255,255,255,.12);
-  padding: 18px 20px;
-  transition: transform .15s ease, box-shadow .15s ease;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  min-height: 220px;
+  background:linear-gradient(180deg,#5b6ef5 0%, #4f5bd4 100%);
+  border:1px solid rgba(255,255,255,.14); border-radius:14px; color:#eef2ff;
+  box-shadow:0 8px 22px rgba(41,53,170,.26), inset 0 1px 0 rgba(255,255,255,.12);
+  padding:18px 20px; transition:transform .15s ease, box-shadow .15s ease;
+  display:flex; flex-direction:column; justify-content:space-between; min-height:220px;
 }
 
 /* ดาวแบบวงกลม */
 .stars{ display:flex; gap:14px; margin-bottom:12px; }
 .star{
-  width:28px; height:28px; border-radius:50%;
-  display:grid; place-items:center;
+  width:28px; height:28px; border-radius:50%; display:grid; place-items:center;
   background:#373a4a; color:#ffd84d; font-size:16px; line-height:1;
   box-shadow: inset 0 0 0 2px rgba(255,255,255,.06);
 }
 .star.empty{ background: rgba(255,255,255,.16); color:#8fa0ff; }
 
 /* เนื้อหารีวิว */
-.content { font-size: 13px; line-height: 1.55; color: #e8edff; word-wrap: break-word; overflow-wrap: break-word; white-space: normal; margin-bottom: 12px; }
+.content { font-size:13px; line-height:1.55; color:#e8edff; word-wrap:break-word; overflow-wrap:break-word; white-space:normal; margin-bottom:12px; }
 
 /* ผู้รีวิวชิดล่าง */
 .reviewer { display:flex; align-items:center; gap:12px; margin-top:auto; padding-top:10px; border-top:1px solid rgba(255,255,255,.1); }
@@ -174,5 +130,5 @@ const isReviewPage = computed(() =>
 @media (max-width:992px){ .review-grid{ grid-template-columns: repeat(2,1fr);} }
 @media (max-width:640px){ .review-grid{ grid-template-columns: 1fr;} }
 
-.wrap { max-width: 1200px; margin: 40px auto; padding: 0 16px; }
+.wrap { max-width:1200px; margin:40px auto; padding:0 16px; }
 </style>
