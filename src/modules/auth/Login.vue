@@ -30,8 +30,8 @@ function doLoginMock() {
     return router.replace(redirectTo)
   }
 
-  // ✅ ใช้ชื่อ route ที่มีจริง
-  if (user.role === 'ADMIN') return router.replace({ name: 'admin.dashboard' })
+  // ✅ เปลี่ยนปลายทางเป็น admin.rooms (แทน admin.dashboard ที่ถูกลบ)
+  if (user.role === 'ADMIN') return router.replace({ name: 'admin.rooms' })
   return router.replace({ name: 'rooms' })
 }
 </script>

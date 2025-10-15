@@ -40,13 +40,23 @@ const router = createRouter({
       component: AdminLayout,
       children: [
         // ✅ ใส่ชื่อ admin.dashboard ให้ตรงกับลิงก์เดิม ๆ
-        { path: '',        name: 'admin.dashboard', component: AdminDashboard },
-        { path: 'rooms',   name: 'admin.rooms',     component: AdminRooms },
+        // { path: '',        
+        //   name: 'admin.dashboard', 
+        //   component: AdminDashboard },
+         // ✅ เมื่อเข้าที่ /admin ให้ redirect ไป /admin/rooms ทันที
+
+        // ✅ หน้า “จองห้อง (Admin)” เป็นหน้าหลัก
+        { path: '', redirect: { name: 'admin.rooms' } },
+
+        // ✅ หน้า “จองห้อง (Admin)” เป็นหน้าหลัก
+        { path: 'rooms',   name: 'admin.rooms', component: AdminRooms },
       ],
     },
 
     // ----- 404 -----
-    { path: '/:pathMatch(.*)*', name: 'notfound', component: { template: '<div style="padding:20px">Not Found</div>' } },
+    { path: '/:pathMatch(.*)*', 
+      name: 'notfound', 
+      component: { template: '<div style="padding:20px">Not Found</div>' } },
   ],
 })
 
@@ -69,7 +79,7 @@ router.beforeEach((to) => {
 
   // ล็อกอินแล้วแต่จะไปหน้า login -> เด้งตาม role
   if (loggedIn && to.name === 'login') {
-    return auth.isAdmin ? { name: 'admin.dashboard' } : { name: 'rooms' }
+    return auth.isAdmin ? { name: 'admin.rooms' } : { name: 'rooms' }
   }
 
   return true
