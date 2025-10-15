@@ -1,398 +1,185 @@
 <script setup>
-import { ref, computed, watch } from 'vue'
+/* ===== รวมกับไฟล์เก่า (ESM + <script setup>) ===== */
+import { ref, onMounted } from 'vue'
+import { fetchReviews } from '@/services/api'
 import ReviewModal from '@/components/user/ReviewModal.vue'
 
-/**
- * MOCK DATA — เปลี่ยนเป็นข้อมูลจาก API ได้ภายหลัง
- * ฟอร์แมตรองรับภาษาไทยเต็มรูปแบบ (Sarabun)
- */
-const allReviews = ref([
-  {
-    name: 'สมชาย ใจดี',
-    date: '12 ก.ย. 2568 • 13:20',
-    rating: 5,
-    text:
-      'ห้องสะอาด อุปกรณ์พร้อมใช้งาน ระบบจองง่ายและรวดเร็ว แนะนำให้ใช้ห้อง A-302 สำหรับประชุมเกิน 10 คน',
-  },
-  {
-    name: 'วิภา รื่นรมย์',
-    date: '11 ก.ย. 2568 • 09:05',
-    rating: 4,
-    text:
-      'แอร์เย็นดี เงียบ เป็นส่วนตัว แต่ปลั๊กไฟบางจุดหลวมเล็กน้อย โดยรวมโอเคค่ะ',
-  },
-  {
-    name: 'อดิศักดิ์ ชาญฉลาด',
-    date: '09 ก.ย. 2568 • 16:48',
-    rating: 3,
-    text:
-      'ห้องเพียงพอสำหรับอ่านหนังสือเป็นกลุ่ม 3-4 คน แต่อินเทอร์เน็ตช้าช่วงบ่าย',
-  },
-  {
-    name: 'กชกร วัฒนะ',
-    date: '07 ก.ย. 2568 • 10:10',
-    rating: 5,
-    text:
-      'เจ้าหน้าที่บริการดีมาก จองผ่านมือถือสะดวก พื้นที่สะอาดเรียบร้อย',
-  },
-  {
-    name: 'ปธานิน พูนสุข',
-    date: '05 ก.ย. 2568 • 14:22',
-    rating: 2,
-    text:
-      'วันนั้นไมค์มีเสียงจี่ ๆ ต้องเรียกเจ้าหน้าที่มาช่วยแก้ แต่ก็แก้ให้เร็ว',
-  },
-  {
-    name: 'ทิชา ใส่ใจ',
-    date: '02 ก.ย. 2568 • 08:55',
-    rating: 4,
-    text:
-      'ระบบจองชัดเจน มีการยืนยันเวลาทางอีเมล สถานที่หาง่าย ที่จอดรถพอมีบ้าง',
-  },
-])
-
+// === state หลักของหน้ารีวิว ===
 const showModal = ref(false)
-const selected = ref('all') // 'all' | 1..5
-const page = ref(1)
-const pageSize = 3
+const page      = ref(1)
+const pageSize  = ref(5)
+const total     = ref(0)
+const reviews   = ref([])
 
-const counts = computed(() => {
-  const c = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
-  allReviews.value.forEach((r) => (c[r.rating]++))
-  return c
-})
+// ไม่กรองห้อง => null (ถ้าจะกรองให้ set เป็นหมายเลขห้อง)
+const roomId = ref(null)
+// ส่งรหัสนักศึกษาจริงจาก store/auth ได้ ภายหลังปรับได้เลย
+const authStudentId = '67025044'
 
-const totalCount = computed(() => allReviews.value.length)
+// === ดึงข้อมูล + จัดการเพจ ===
+async function load() {
+  const { data } = await fetchReviews({
+    page: page.value, pageSize: pageSize.value,
+    room_id: roomId.value ?? undefined
+  })
+  reviews.value = data.data
+  total.value   = data.total
+}
+function onSubmitted(newRow) {
+  reviews.value.unshift(newRow)
+  total.value += 1
+}
+function prevPage(){ if (page.value > 1) { page.value--; load() } }
+function nextPage(){ if (page.value * pageSize.value < total.value) { page.value++; load() } }
 
-const filtered = computed(() => {
-  if (selected.value === 'all') return allReviews.value
-  return allReviews.value.filter((r) => r.rating === selected.value)
-})
-
-const pages = computed(() => Math.max(1, Math.ceil(filtered.value.length / pageSize)))
-
-const pagedReviews = computed(() => {
-  const start = (page.value - 1) * pageSize
-  return filtered.value.slice(start, start + pageSize)
-})
-
-watch(selected, () => (page.value = 1))
-
-const setFilter = (val) => {
-  selected.value = val
+// === helper แสดงชื่อ/อักษรย่อ/วันที่ ===
+function displayName(r){ return r.display_name || r.created_by || 'ผู้ใช้' }
+function initials(r){
+  const name = displayName(r).toString().trim()
+  if (/^\d+$/.test(name)) return name.slice(-2)
+  return name.slice(0,2).toUpperCase()
+}
+function formatDate(dt){
+  try {
+    return new Date(dt).toLocaleString('th-TH',{
+      year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'
+    })
+  } catch { return dt }
 }
 
-const initials = (fullName) => {
-  const parts = String(fullName).trim().split(/\s+/)
-  if (parts.length === 1) return parts[0][0] || 'ผ'
-  return (parts[0][0] + (parts[1]?.[0] || '')).toUpperCase()
-}
-
-const { showComposer, showSummary } = defineProps({
-  // โชว์/ซ่อนปุ่ม + โมดอลเขียนความเห็น
-  showComposer: { type: Boolean, default: true },
-  // โชว์/ซ่อน "บล็อกพรีวิวด้านบน" (หัว 'ช่องแสดงความคิดเห็น' + การ์ด 4 ใบ)
-  showSummary:  { type: Boolean, default: true }
-})
+onMounted(load)
 </script>
 
-<!-- src/pages/Review.vue -->
 <template>
-  <section class="review-wrap">
-    <!-- Header -->
-    <div class="header-row">
-      <div class="chip">
-        <span class="th">รีวิว</span>
-        <span class="en">Review</span>
-      </div>
-
-      <div class="header-actions" v-if="showComposer">
-        <button class="write-btn" @click="showModal = true">แสดงความคิดเห็น</button>
-      </div>
-    </div>
-
-    <!-- Filter / Pills -->
-    <div class="filters">
-      <button
-        class="pill"
-        :class="{ active: selected === 'all' }"
-        @click="setFilter('all')"
-      >
-        ความคิดเห็นทั้งหมด ({{ totalCount }})
-      </button>
-
-      <button
-        v-for="n in [5,4,3,2,1]"
-        :key="n"
-        class="pill"
-        :class="{ active: selected === n }"
-        @click="setFilter(n)"
-      >
-        {{ n }} ดาว ({{ counts[n] || 0 }})
+  <section class="rv-page">
+    <!-- แถบหัวเรื่อง + ปุ่มเขียนรีวิว -->
+    <div class="rv-toolbar">
+      <h2 class="rv-title">รีวิวทั้งหมด</h2>
+      <button type="button" class="rv-btn rv-btn-primary" @click="showModal = true">
+        <span class="rv-pen">✍️</span>
+        <span class="rv-label">เขียนรีวิว</span>
       </button>
     </div>
 
-    <!-- Review Cards -->
-    <div class="cards">
-      <div class="card" v-for="(rv, idx) in pagedReviews" :key="idx">
-        <div class="card-head">
-          <div class="avatar">{{ initials(rv.name) }}</div>
-          <div class="meta">
-            <div class="name">{{ rv.name }}</div>
-            <div class="date">{{ rv.date }}</div>
+    <!-- รายการรีวิวแบบการ์ด -->
+    <div v-if="reviews.length === 0" class="rv-empty">ยังไม่มีรีวิว</div>
+    <div v-else class="rv-list">
+      <article v-for="r in reviews" :key="r.id" class="rv-card">
+        <div class="rv-avatar">{{ initials(r) }}</div>
+
+        <div class="rv-content">
+          <div class="rv-row-top">
+            <div class="rv-name">{{ displayName(r) }}</div>
+            <div class="rv-stars" :aria-label="`${r.rating} ดาว`">
+              <span v-for="n in 5" :key="n" class="rv-star" :class="{ active:n<=r.rating }">★</span>
+            </div>
           </div>
-          <div class="stars">
-            <span
-              v-for="i in 5"
-              :key="i"
-              :class="['star', { on: i <= rv.rating }]"
-              >★</span
-            >
+
+          <p class="rv-comment">{{ r.comment }}</p>
+
+          <div class="rv-meta">
+            <span>{{ formatDate(r.created_at) }}</span>
+            <span v-if="r.room_id">• ห้อง #{{ r.room_id }}</span>
           </div>
         </div>
-
-        <p class="text">
-          {{ rv.text }}
-        </p>
-      </div>
-
-      <!-- No data -->
-      <div v-if="pagedReviews.length === 0" class="empty">
-        ยังไม่มีความคิดเห็นในตัวกรองนี้
-      </div>
+      </article>
     </div>
 
-    <!-- Pagination -->
-    <div class="pagination" v-if="pages > 1">
-      <button class="pg" :disabled="page===1" @click="page--">‹</button>
-      <button
-        class="pg"
-        v-for="p in pages"
-        :key="p"
-        :class="{ active: page === p }"
-        @click="page = p"
-      >
-        {{ p }}
-      </button>
-      <button class="pg" :disabled="page===pages" @click="page++">›</button>
+    <!-- เพจจิเนชัน -->
+    <div class="rv-pager">
+      <button class="rv-btn" :disabled="page===1" @click="prevPage">ก่อนหน้า</button>
+      <span>หน้า {{ page }}</span>
+      <button class="rv-btn" :disabled="page*pageSize>=total" @click="nextPage">ถัดไป</button>
+      <span class="rv-muted">รวม {{ total }} รีวิว</span>
     </div>
 
-    <!-- Modal -->
-    <ReviewModal v-if="showComposer" v-model:open="showModal" />
+    <!-- โมดอลเขียนรีวิว -->
+    <ReviewModal
+      v-model:open="showModal"
+      :room-id="roomId"
+      :created-by="authStudentId"
+      @submitted="onSubmitted"
+    />
   </section>
 </template>
 
-
-
 <style scoped>
-/* -------- Base / Container -------- */
-.review-wrap {
-  font-family: 'Sarabun', system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue',
-    Arial, 'Noto Sans Thai', sans-serif;
-  background: #faf7f2; /* ครีมอ่อนตามภาพ */
-  padding: 28px;
-  border-radius: 24px;
-  max-width: 980px;
-  margin: 24px auto 40px;
-  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.04);
+/* ===== ดีไซน์ใหม่ ไม่ชนของเก่า (prefix rv-) ===== */
+:root {
+  --rv-bg:#f7f8fa; --rv-card:#fff;
+  --rv-text:#1f2937; --rv-muted:#6b7280;
+  --rv-primary:#2563eb; --rv-primary-600:#1d4ed8;
+  --rv-border:#e5e7eb; --rv-star:#f59e0b;
 }
 
-/* -------- Header -------- */
-.header-row {
-  display: flex;
+.rv-page{ max-width:960px; margin:24px auto; padding:0 16px; }
+.rv-toolbar{ display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+.rv-title{ font-size:22px; font-weight:700; color:var(--rv-text); }
+
+.rv-btn{
+  display:inline-flex; align-items:center; justify-content:center;
+  padding:10px 14px; border-radius:10px; border:1px solid var(--rv-border);
+  background:#fff; color:var(--rv-text); cursor:pointer; transition:.15s ease;
+  text-decoration:none; line-height:1;
+}
+.rv-btn:hover{ transform:translateY(-1px); box-shadow:0 2px 8px rgba(0,0,0,.06); }
+.rv-btn:disabled{ opacity:.6; cursor:not-allowed; }
+.rv-btn-primary{ background:var(--rv-primary); border-color:var(--rv-primary); color:#fff; }
+.rv-btn-primary:hover{ background:var(--rv-primary-600); border-color:var(--rv-primary-600); }
+
+.rv-list{ display:grid; gap:14px; }
+.rv-card{
+  display:grid; grid-template-columns:56px 1fr; gap:12px;
+  background:var(--rv-card); border:1px solid var(--rv-border);
+  border-radius:14px; padding:16px; box-shadow:0 4px 12px rgba(0,0,0,.04);
+}
+.rv-avatar{
+  width:56px; height:56px; border-radius:50%; display:grid; place-items:center;
+  background:linear-gradient(135deg,#a5b4fc,#93c5fd); color:#fff; font-weight:700; font-size:18px;
+}
+.rv-content{ display:flex; flex-direction:column; gap:6px; }
+.rv-row-top{ display:flex; align-items:center; justify-content:space-between; }
+.rv-name{ font-weight:600; color:var(--rv-text); }
+.rv-stars .rv-star{ color:#e5e7eb; font-size:16px; letter-spacing:1px; }
+.rv-stars .rv-star.active{ color:var(--rv-star); text-shadow:0 0 1px rgba(0,0,0,.15); }
+.rv-comment{ color:var(--rv-text); line-height:1.5; white-space:pre-wrap; }
+.rv-meta{ font-size:12px; color:var(--rv-muted); }
+
+.rv-pager{ display:flex; align-items:center; gap:10px; margin-top:14px; }
+.rv-muted{ color:var(--rv-muted); margin-left:auto; }
+.rv-empty{ text-align:center; color:var(--rv-muted); padding:24px 0; }
+
+/* ===== FIX: บังคับให้ปุ่มแสดงข้อความชัดเจน ไม่โดนธีมอื่นกลบ ===== */
+.rv-btn {
+  display: inline-flex !important;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 18px;
-}
-
-.chip {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 10px;
-  background: #fff;
-  border: 1px solid #eee5d9;
-  border-radius: 12px;
-  padding: 10px 14px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
-}
-
-.chip .th {
-  font-weight: 700;
-  color: #1f2937;
-  font-size: 18px;
-}
-.chip .en {
-  font-weight: 600;
-  color: #6b7280;
-  font-size: 14px;
-}
-
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.write-btn {
-  background: #ffffff;
-  border: 1.5px solid #e5e7eb;
-  border-radius: 10px;
-  padding: 10px 16px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: 0.2s ease;
-}
-.write-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 5px 16px rgba(0, 0, 0, 0.06);
-}
-
-/* -------- Filters (Pills) -------- */
-.filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 18px;
-}
-.pill {
-  background: #ffffff;
-  border: 1.5px solid #e9e1d7;
-  border-radius: 999px;
-  padding: 8px 14px;
-  font-weight: 600;
-  font-size: 14px;
-  color: #374151;
-  cursor: pointer;
-  transition: 0.2s ease;
-}
-.pill:hover {
-  border-color: #d6c7b4;
-  transform: translateY(-1px);
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.06);
-}
-.pill.active {
-  background: #111827;
-  color: #fff;
-  border-color: #111827;
-}
-
-/* -------- Cards -------- */
-.cards {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 14px;
-}
-
-.card {
-  background: #ffffff;
-  border: 1px solid #ede7de;
-  border-radius: 14px;
-  padding: 16px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
-}
-
-.card-head {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 12px;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
-.avatar {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: #f3f4f6;
-  display: grid;
-  place-items: center;
-  font-weight: 800;
-  color: #4b5563;
-  border: 1px solid #e5e7eb;
-}
-
-.meta .name {
-  font-weight: 700;
-  color: #111827;
-  line-height: 1.2;
-}
-.meta .date {
-  font-size: 12px;
-  color: #6b7280;
-  margin-top: 2px;
-}
-
-.stars {
-  white-space: nowrap;
-  user-select: none;
-}
-.star {
-  font-size: 18px;
-  color: #d1d5db; /* เทาอ่อน (ดาวว่าง) */
-  margin-left: 2px;
-}
-.star.on {
-  color: #f5b301; /* ทอง */
-}
-
-.text {
-  color: #374151;
-  line-height: 1.7;
-  margin: 6px 2px 4px;
-}
-
-/* -------- Pagination -------- */
-.pagination {
-  display: flex;
   justify-content: center;
-  gap: 6px;
-  margin-top: 14px;
-}
-.pg {
-  min-width: 36px;
-  height: 36px;
-  padding: 0 10px;
+  gap: 8px;
+  padding: 10px 14px;
   border-radius: 10px;
-  border: 1.5px solid #e5e7eb;
+  border: 1px solid var(--rv-border, #e5e7eb);
   background: #fff;
-  cursor: pointer;
-  font-weight: 600;
-  transition: 0.2s ease;
+  color: var(--rv-text, #111827) !important;
+  font-size: 14px !important;
+  line-height: 1 !important;
+  letter-spacing: normal !important;
+  text-indent: 0 !important;
+  text-decoration: none !important;
+  white-space: nowrap;
 }
-.pg:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.06);
+.rv-btn-primary {
+  background: var(--rv-primary, #2563eb) !important;
+  border-color: var(--rv-primary, #2563eb) !important;
+  color: #fff !important;
 }
-.pg:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-.pg.active {
-  background: #111827;
-  color: #fff;
-  border-color: #111827;
+/* กันเคสบางธีมซ่อนข้อความ/เปลี่ยนสีในปุ่ม */
+.rv-btn * {
+  color: inherit !important;
+  visibility: visible !important;
+  font-size: inherit !important;
 }
 
-/* -------- Responsive -------- */
-@media (max-width: 768px) {
-  .review-wrap {
-    padding: 18px;
-    border-radius: 18px;
-  }
-  .chip {
-    padding: 8px 12px;
-  }
-  .write-btn {
-    padding: 8px 12px;
-  }
-  .card-head {
-    grid-template-columns: auto 1fr;
-    row-gap: 6px;
-  }
-  .stars {
-    grid-column: 1 / -1;
-    justify-self: start;
-  }
+@media (max-width:640px){
+  .rv-toolbar{ flex-direction:column; align-items:flex-start; gap:10px; }
 }
 </style>
