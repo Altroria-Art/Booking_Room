@@ -7,12 +7,30 @@ const auth = useAuthStore()
 const router = useRouter()
 const route = useRoute()
 
+// ใช้ path ตรง ๆ ลดความเสี่ยงชื่อ route ไม่ตรง
+const userMenu = [
+  { key: 'home',  name: 'หน้าแรก', to: '/' },
+  { key: 'rooms', name: 'จองห้อง', to: '/rooms' },
+]
+const adminMenu = [
+  { key: 'dashboard', name: 'แดชบอร์ด', to: '/admin' },
+  { key: 'rooms',     name: 'จัดการห้อง', to: '/admin/rooms' },
+  { key: 'users',     name: 'ผู้ใช้',     to: '/admin/users' },
+]
+
+const menu = computed(() => (auth.isAdmin ? adminMenu : userMenu))
+const activePath = computed(() => route.path)
+
 function logout() {
   auth.clear()
-  router.replace({ name: 'login' })
+  router.replace('/login')
 }
 
-const activeName = computed(() => route.name)
+// กันพังเวลาแอดมินกด — ถ้า route ไม่มีจะไม่พาไปและไม่ error
+function goAdminSafe(path = '/admin') {
+  // มีชื่อ route หรือไม่ไม่สำคัญ เพราะเราใช้ path
+  router.push(path).catch(() => {})
+}
 </script>
 
 <template>
@@ -30,7 +48,7 @@ const activeName = computed(() => route.name)
           v-for="m in menu" :key="m.key"
           :to="m.to"
           class="link"
-          :class="{ 'router-link-active': activeName===m.to.name }"
+          :class="{ 'router-link-active': activePath===m.to }"
         >
           {{ m.name }}
         </router-link>
@@ -43,15 +61,12 @@ const activeName = computed(() => route.name)
             สวัสดี, <strong>{{ auth.displayName }}</strong>
             <span v-if="auth.studentId"> ({{ auth.studentId }})</span>
             <span class="badge user" v-if="!auth.isAdmin">USER</span>
+            <button v-if="auth.isAdmin" class="badge admin" @click="goAdminSafe('/admin')">
+              ADMIN
+            </button>
           </span>
-
-          <router-link v-if="auth.isAdmin" class="badge admin" :to="{ name: 'admin.dashboard' }">
-            ADMIN
-          </router-link>
-
           <button class="btn" @click="logout">ออกจากระบบ</button>
         </template>
-
         <template v-else>
           <router-link class="btn" to="/login">เข้าสู่ระบบ</router-link>
         </template>
@@ -81,7 +96,7 @@ const activeName = computed(() => route.name)
 /* ด้านขวา */
 .nav-right{ display:inline-flex; align-items:center; gap:12px; }
 .who{ font-size:13px; color:#334155; }
-.badge{ font-size:11px; padding:2px 8px; border-radius:999px; margin-left:6px; text-decoration:none; }
+.badge{ font-size:11px; padding:2px 8px; border-radius:999px; margin-left:6px; text-decoration:none; cursor:pointer; border:0; }
 .badge.user{ background:#ecfdf5; color:#047857; }
 .badge.admin{ background:#eef2ff; color:#3730a3; }
 
