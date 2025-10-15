@@ -1,7 +1,8 @@
-import axios from 'axios'
-export const api = axios.create({ baseURL: import.meta.env.VITE_API_BASE_URL })
+// src/services/api.js
+import api from '@/plugins/axios'
 
-export const fetchBookingsOfDay = (date /* 'YYYY-MM-DD' */) =>
-  api.get('/bookings', { params: { date } })
+export const fetchReviews = (params = {}) =>
+  api.get('/reviews', { params })       // { page, pageSize, room_id }
 
-export const fetchRooms = () => api.get('/rooms')
+export const createReview = (payload) =>
+  api.post('/reviews', payload)          // { rating, comment, created_by, room_id? }

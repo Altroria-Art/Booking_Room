@@ -1,18 +1,17 @@
 // src/plugins/axios.js
 import axios from 'axios'
-import { useAuthStore } from '@/stores/auth'
 
 const api = axios.create({
-  baseURL: 'http://localhost:3000/api' // ชี้ไป backend
+  baseURL: `${import.meta.env.VITE_API_BASE_URL}/api`,
+  withCredentials: false
 })
 
-api.interceptors.request.use((config) => {
-  // inject token
-  try {
-    const auth = useAuthStore()
-    if (auth.token) config.headers.Authorization = `Bearer ${auth.token}`
-  } catch {}
-  return config
-})
+api.interceptors.response.use(
+  r => r,
+  err => {
+    console.error('[API ERROR]', err?.response?.data || err.message)
+    return Promise.reject(err)
+  }
+)
 
 export default api
