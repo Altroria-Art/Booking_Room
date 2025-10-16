@@ -19,13 +19,11 @@ function goAdminSafe(path = '/admin') {
 <template>
   <header class="nav">
     <div class="nav-wrap">
-      <!-- โลโก้ -->
-      <router-link to="/" class="brand">
+      <!-- โลโก้: ไปหน้าหลักผู้ใช้ (Rooms.vue) -->
+      <router-link :to="{ name: 'user.rooms' }" class="brand">
         <span class="brand-main">Booking</span>
         <span class="brand-accent">Room</span>
       </router-link>
-
-      <!-- ✅ เอาส่วนเมนูออกแล้ว -->
 
       <!-- ขวา -->
       <div class="nav-right">
