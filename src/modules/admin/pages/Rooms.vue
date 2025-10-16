@@ -1,9 +1,10 @@
 <script setup>
 import { ref } from 'vue'
 import EditRoomModal from '@/components/admin/EditRoomModal.vue'
+import AddRoomModal from '@/components/admin/AddRoomModal.vue' 
 
 const showEdit = ref(false)
-
+const showAdd  = ref(false)  
 // ถ้าคุณมีฟังก์ชันโหลดรายการห้องอยู่แล้ว ให้เรียกหลังแก้ไข/ลบเสร็จ
 const loadRooms = () => {
   // ... โค้ดโหลดห้องเดิมของคุณ
@@ -17,13 +18,24 @@ const loadRooms = () => {
     <!-- <UserRooms admin-mode /> -->
   </section>
   <div class="toolbar">
-    <button class="edit-btn" @click="showEdit = true">
+   <!-- ปุ่มเพิ่มห้อง (เขียว) -->
+    <button class="add-btn" @click="showAdd = true">
+      เพิ่มห้อง
+      <span class="pill">+</span>
+   </button>
+   <!-- ปุ่มแก้ไขห้อง (ของเดิม) -->
+   <button class="edit-btn" @click="showEdit = true">
       แก้ไขห้อง
       <span class="pill">+</span>
-    </button>
-  </div>
+   </button>
+ </div>
 
   <!-- รายการห้องของเดิมคุณ -->
+  <!-- โมดัลเพิ่มห้อง (ใหม่) -->
+  <AddRoomModal
+    v-model:open="showAdd"
+    @created="loadRooms"   
+  />
 
   <EditRoomModal
     v-model:open="showEdit"
@@ -38,6 +50,22 @@ const loadRooms = () => {
   justify-content: flex-end;
   margin: 16px 0 8px;
 }
+.add-btn{
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  font-weight: 700;
+  border: none;
+  background: #7dfc90;       /* เขียวตามภาพตัวอย่าง */
+  color: #111;
+  padding: 10px 16px;
+  border-radius: 12px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0,0,0,.12);
+}
+.add-btn:hover { filter: brightness(0.98); 
+}
+
 .edit-btn {
   display: inline-flex;
   align-items: center;
