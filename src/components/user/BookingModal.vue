@@ -1,7 +1,12 @@
 <!-- src/components/user/BookingModal.vue -->
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
+import { useAuthStore } from '@/store/auth'
 import api from '@/plugins/axios'   // ✅ ใช้ axios ที่ผูก baseURL/Authorization ไว้
+
+// ======= auth / owner =======
+const auth = useAuthStore()
+const ownerId = computed(() => (auth?.studentId || '').trim())  // รหัสนิสิตของคนล็อกอิน
 
 // ======= state หลัก =======
 const open = defineModel('open', { type: Boolean, default: false })
@@ -12,7 +17,6 @@ const errorMsg = ref('')
 const roomTypes = ref([]) // [{id,type_name}]
 const rooms = ref([])     // [{id,room_code,type_id,type_name}]
 
-// ถ้าอยากเผื่อในอนาคตยังใช้ filter ฝั่งหน้า ให้คง computed ไว้
 const selectedTypeId = ref(null)
 const filteredRooms = computed(() => {
   if (!selectedTypeId.value) return []
@@ -41,27 +45,41 @@ const endOptions = computed(() => {
   const e2 = `${String(Math.min(h+2,16)).padStart(2,'0')}:00`
   return hourOptions.value.filter(t => t >= e1 && t <= e2)
 })
-// ถ้าเปลี่ยน start แล้ว end หลุดช่วง ให้เคลียร์
 watch(startAt, () => {
   if (endAt.value && !endOptions.value.includes(endAt.value)) endAt.value = ''
 })
 
 // ========= จำนวนผู้ใช้ และรหัสนิสิต =========
+// memberCount = จำนวนสมาชิกทั้งหมด "รวมเจ้าของด้วย"
 const memberCount = ref(5) // default 5
-const memberIds = ref(Array.from({length: 5}, () => ''))
+const othersNeeded = computed(() => Math.max(0, Number(memberCount.value || 0) - 1))
 
-watch(memberCount, (n) => {
-  const cur = memberIds.value.length
-  if (n > cur) for (let i=0; i<n-cur; i++) memberIds.value.push('')
-  else if (n < cur) memberIds.value.splice(n)
-})
+// อาร์เรย์ “สมาชิกคนอื่น ๆ” ไม่รวมเจ้าของ
+const otherIds = ref([])
+
+// ✅ ซิงค์จำนวนช่องสมาชิกคนอื่น ๆ ให้เท่ากับ memberCount - 1
+function syncOtherIds() {
+  const need = othersNeeded.value
+  while (otherIds.value.length < need) otherIds.value.push('')
+  while (otherIds.value.length > need) otherIds.value.pop()
+}
+
+// เรียกซิงค์เมื่อเปลี่ยนจำนวนสมาชิก
+watch(memberCount, syncOtherIds)
+
+function sanitizeId(s) {
+  return String(s || '').replace(/\s+/g, '').trim()
+}
+function isValidStudentId(id) {
+  // ปรับรูปแบบตามจริงได้ ที่นี่กำหนด 8–10 หลักเป็นตัวเลข
+  return /^\d{8,10}$/.test(id)
+}
 
 // ========= โหลด master data =========
 async function fetchRoomTypes() {
   const { data } = await api.get('/room-types')         // GET /api/room-types
   roomTypes.value = data
 }
-
 async function fetchRoomsByType() {
   if (!selectedTypeId.value) { rooms.value = []; return }
   const { data } = await api.get(`/rooms`, { params: { typeId: selectedTypeId.value } }) // GET /api/rooms?typeId=...
@@ -75,22 +93,21 @@ function resetForm() {
   selectedRoomCode.value = ''
   startAt.value = ''
   endAt.value = ''
-  memberCount.value = 5
-  memberIds.value = Array.from({length: 5}, () => '')
+
+  memberCount.value = 5          // ตั้งค่าเริ่ม
+  otherIds.value = []            // เคลียร์ช่อง
+  syncOtherIds()                 // ✅ ทำให้ขึ้น 4 ช่องทันที (เพราะรวมเจ้าของแล้วเป็น 5)
 }
 
 watch(open, async (v) => {
   if (!v) return
   try {
-    errorMsg.value = ''
     resetForm()
     if (!roomTypes.value.length) await fetchRoomTypes()
   } catch (e) {
     errorMsg.value = e?.message || 'โหลดข้อมูลไม่สำเร็จ'
   }
 })
-
-// เมื่อเปลี่ยนประเภทห้อง ให้โหลดห้องของประเภทนั้น
 watch(selectedTypeId, async () => {
   selectedRoomCode.value = ''
   try {
@@ -104,20 +121,39 @@ watch(selectedTypeId, async () => {
 async function submit() {
   try {
     errorMsg.value = ''
+
+    if (!ownerId.value) {
+      throw new Error('ไม่พบรหัสนิสิตของผู้ใช้ กรุณาออกจากระบบและล็อกอินใหม่')
+    }
     if (!selectedTypeId.value) throw new Error('กรุณาเลือกประเภทห้อง')
     if (!selectedRoomCode.value) throw new Error('กรุณาเลือกห้อง')
     if (!startAt.value || !endAt.value) throw new Error('กรุณาเลือกเวลาเริ่ม/สิ้นสุด')
 
-    const list = memberIds.value.map(s => (s||'').trim()).filter(Boolean)
-    if (list.length !== memberCount.value)
+    // รวม owner + สมาชิกคนอื่น ๆ
+    const raw = [ownerId.value, ...otherIds.value]
+    const cleaned = raw.map(sanitizeId)
+
+    // ตรวจช่องว่าง
+    if (cleaned.some((v) => !v)) {
       throw new Error('กรุณากรอกรหัสนิสิตให้ครบตามจำนวนผู้ใช้')
+    }
+
+    // ตรวจรูปแบบ
+    const bad = cleaned.find(id => !isValidStudentId(id))
+    if (bad) throw new Error(`รูปแบบรหัสนิสิตไม่ถูกต้อง: ${bad}`)
+
+    // ตรวจซ้ำ และจำนวนต้องตรงกับ memberCount
+    const unique = Array.from(new Set(cleaned))
+    if (unique.length !== Number(memberCount.value)) {
+      throw new Error('พบรหัสซ้ำกัน หรือจำนวนสมาชิกไม่ครบตามที่เลือก')
+    }
 
     // ✅ ให้ตรงกับ backend: routes/bookings.js ({ roomCode, startAt, endAt, members })
     const payload = {
       roomCode: selectedRoomCode.value,
       startAt: `${date.value} ${startAt.value}:00`,
       endAt:   `${date.value} ${endAt.value}:00`,
-      members: list
+      members: unique               // รวมเจ้าของแล้ว
     }
 
     loading.value = true
@@ -126,7 +162,6 @@ async function submit() {
     open.value = false
     alert('จองสำเร็จ')
   } catch (e) {
-    // backend คืน { message: '...' } จาก SP/ตรวจสอบต่าง ๆ
     errorMsg.value = e?.response?.data?.message || e?.message || 'สร้างการจองไม่สำเร็จ'
   } finally {
     loading.value = false
@@ -183,13 +218,22 @@ onMounted(() => {
         <select v-model.number="memberCount">
           <option v-for="n in [5,6,7,8,9,10]" :key="n" :value="n">{{ n }}</option>
         </select>
+        <small>จำนวนนี้ “รวมเจ้าของผู้จอง ({{ ownerId || '—' }})” แล้ว</small>
       </div>
 
+      <!-- Owner (disabled) -->
       <div class="members">
-        <label>กรอกรหัสนิสิต *</label>
-        <div v-for="(sid, i) in memberIds" :key="i" class="member-row">
-          <input v-model="memberIds[i]" placeholder="เช่น 67012345" />
+        <label>รหัสนิสิต (เจ้าของผู้จอง)</label>
+        <input :value="ownerId" disabled class="owner-input" />
+      </div>
+
+      <!-- Others -->
+      <div class="members">
+        <label>รหัสนิสิต (สมาชิกคนอื่น ๆ)</label>
+        <div v-for="(v, i) in otherIds" :key="i" class="member-row">
+          <input v-model="otherIds[i]" placeholder="เช่น 67012345" inputmode="numeric" />
         </div>
+        <small>ต้องกรอกสมาชิกคนอื่น ๆ {{ othersNeeded }} คน</small>
       </div>
 
       <p v-if="errorMsg" class="error">{{ errorMsg }}</p>
@@ -209,7 +253,8 @@ onMounted(() => {
 .field{ margin-bottom:12px; display:flex; flex-direction:column; gap:6px }
 .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:12px }
 .members{ display:flex; flex-direction:column; gap:6px; margin:8px 0 }
-.member-row input{ width:100%; padding:10px 12px; border:1px solid #e5e7eb; border-radius:10px }
+.member-row input, .owner-input{ width:100%; padding:10px 12px; border:1px solid #e5e7eb; border-radius:10px; background:#fff }
+.owner-input[disabled]{ background:#f8fafc; color:#334155 }
 select, input{ padding:10px 12px; border:1px solid #e5e7eb; border-radius:10px }
 .actions{ display:flex; justify-content:space-between; gap:12px; margin-top:16px }
 .btn{ padding:10px 14px; border-radius:10px; border:none; cursor:pointer; font-weight:700 }
