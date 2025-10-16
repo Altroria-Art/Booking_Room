@@ -1,20 +1,23 @@
+<!-- src/components/user/BookingModal.vue -->
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
+import api from '@/plugins/axios'   // ✅ ใช้ axios ที่ผูก baseURL/Authorization ไว้
 
 // ======= state หลัก =======
 const open = defineModel('open', { type: Boolean, default: false })
 const loading = ref(false)
 const errorMsg = ref('')
 
-// ดึง master data
+// ======= master data =======
 const roomTypes = ref([]) // [{id,type_name}]
 const rooms = ref([])     // [{id,room_code,type_id,type_name}]
+
+// ถ้าอยากเผื่อในอนาคตยังใช้ filter ฝั่งหน้า ให้คง computed ไว้
+const selectedTypeId = ref(null)
 const filteredRooms = computed(() => {
   if (!selectedTypeId.value) return []
   return rooms.value.filter(r => r.type_id === selectedTypeId.value)
 })
-
-const selectedTypeId = ref(null)
 const selectedRoomCode = ref('')
 
 // ========= เวลา (ชั่วโมงตรงเท่านั้น) =========
@@ -53,25 +56,51 @@ watch(memberCount, (n) => {
   else if (n < cur) memberIds.value.splice(n)
 })
 
-// โหลด room types/rooms (ถ้าอยากโหลดห้องตามประเภท แนะนำไปใช้ watch(selectedTypeId) ดึง /api/rooms?typeId=...)
-async function fetchMasters() {
-  const [rt, rs] = await Promise.all([
-    fetch('/api/room-types').then(r=>r.json()),
-    fetch('/api/rooms').then(r=>r.json())
-  ])
-  roomTypes.value = rt
-  rooms.value = rs
+// ========= โหลด master data =========
+async function fetchRoomTypes() {
+  const { data } = await api.get('/room-types')         // GET /api/room-types
+  roomTypes.value = data
 }
 
-// reset เมื่อเปิด/ปิด
-watch(open, (v) => {
-  if (v) {
+async function fetchRoomsByType() {
+  if (!selectedTypeId.value) { rooms.value = []; return }
+  const { data } = await api.get(`/rooms`, { params: { typeId: selectedTypeId.value } }) // GET /api/rooms?typeId=...
+  rooms.value = data
+}
+
+// reset เมื่อเปิดโมดัล
+function resetForm() {
+  errorMsg.value = ''
+  selectedTypeId.value = null
+  selectedRoomCode.value = ''
+  startAt.value = ''
+  endAt.value = ''
+  memberCount.value = 5
+  memberIds.value = Array.from({length: 5}, () => '')
+}
+
+watch(open, async (v) => {
+  if (!v) return
+  try {
     errorMsg.value = ''
-    if (!roomTypes.value.length) fetchMasters()
+    resetForm()
+    if (!roomTypes.value.length) await fetchRoomTypes()
+  } catch (e) {
+    errorMsg.value = e?.message || 'โหลดข้อมูลไม่สำเร็จ'
   }
 })
 
-// ส่งจอง
+// เมื่อเปลี่ยนประเภทห้อง ให้โหลดห้องของประเภทนั้น
+watch(selectedTypeId, async () => {
+  selectedRoomCode.value = ''
+  try {
+    await fetchRoomsByType()
+  } catch (e) {
+    errorMsg.value = e?.message || 'โหลดห้องไม่สำเร็จ'
+  }
+})
+
+// ========= ส่งจอง =========
 async function submit() {
   try {
     errorMsg.value = ''
@@ -80,35 +109,33 @@ async function submit() {
     if (!startAt.value || !endAt.value) throw new Error('กรุณาเลือกเวลาเริ่ม/สิ้นสุด')
 
     const list = memberIds.value.map(s => (s||'').trim()).filter(Boolean)
-    if (list.length !== memberCount.value) throw new Error('กรุณากรอกรหัสนิสิตให้ครบตามจำนวนผู้ใช้')
+    if (list.length !== memberCount.value)
+      throw new Error('กรุณากรอกรหัสนิสิตให้ครบตามจำนวนผู้ใช้')
 
+    // ✅ ให้ตรงกับ backend: routes/bookings.js ({ roomCode, startAt, endAt, members })
     const payload = {
-      room_code: selectedRoomCode.value,
-      start_at: `${date.value} ${startAt.value}:00`,
-      end_at:   `${date.value} ${endAt.value}:00`,
-      created_by: list[0],
+      roomCode: selectedRoomCode.value,
+      startAt: `${date.value} ${startAt.value}:00`,
+      endAt:   `${date.value} ${endAt.value}:00`,
       members: list
     }
 
     loading.value = true
-    const r = await fetch('/api/bookings', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify(payload)
-    })
-    const body = await r.json().catch(()=> ({}))
-    if (!r.ok) throw new Error(body.error || 'สร้างการจองไม่สำเร็จ')
+    await api.post('/bookings', payload)   // POST /api/bookings (มี token จาก axios interceptor)
 
     open.value = false
     alert('จองสำเร็จ')
   } catch (e) {
-    errorMsg.value = e.message || String(e)
+    // backend คืน { message: '...' } จาก SP/ตรวจสอบต่าง ๆ
+    errorMsg.value = e?.response?.data?.message || e?.message || 'สร้างการจองไม่สำเร็จ'
   } finally {
     loading.value = false
   }
 }
 
-onMounted(fetchMasters)
+onMounted(() => {
+  // เปิดหน้าแล้วจะยังไม่ยิง; รอเปิด modal ค่อยโหลด room-types
+})
 </script>
 
 <template>
@@ -126,7 +153,7 @@ onMounted(fetchMasters)
 
       <div class="field">
         <label>กรุณาเลือกห้อง *</label>
-        <select v-model="selectedRoomCode">
+        <select v-model="selectedRoomCode" :disabled="!selectedTypeId">
           <option value="">กรุณาเลือกห้อง</option>
           <option v-for="r in filteredRooms" :key="r.id" :value="r.room_code">
             {{ r.room_code }}
