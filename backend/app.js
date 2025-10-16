@@ -6,12 +6,16 @@ dotenv.config()
 
 import authRoute from './routes/auth.js'
 import bookingsRoute from './routes/bookings.js'
-import reviewsRoute from './routes/reviews.js'   // ✅ เพิ่ม route รีวิว
+import reviewsRoute from './routes/reviews.js'
+import roomsRoute from './routes/rooms.js'      // 🆕 เพิ่ม router สำหรับประเภทห้อง/ห้อง
 
 const app = express()
 
 // อนุญาต origin จาก .env (รองรับคอมมาแยกหลายโดเมน)
-const origins = (process.env.CORS_ORIGIN || '').split(',').map(s => s.trim()).filter(Boolean)
+const origins = (process.env.CORS_ORIGIN || '')
+  .split(',')
+  .map(s => s.trim())
+  .filter(Boolean)
 
 app.use(cors({
   origin: origins.length ? origins : true,  // ถ้าไม่ได้ตั้งไว้ จะเปิดให้ทุก origin (เฉพาะ dev)
@@ -25,7 +29,8 @@ app.get('/api/health', (req, res) => res.json({ ok: true }))
 // routes หลัก
 app.use('/api/auth', authRoute)
 app.use('/api/bookings', bookingsRoute)
-app.use('/api/reviews', reviewsRoute)        // ✅ ผูก /api/reviews
+app.use('/api/reviews', reviewsRoute)
+app.use('/api', roomsRoute)                  // 🆕 ผูก /api/room-types และ /api/rooms
 
 // 404 สำหรับเส้นทางที่ไม่พบ
 app.use((req, res) => {
