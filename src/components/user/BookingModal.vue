@@ -2,11 +2,11 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { useAuthStore } from '@/store/auth'
-import api from '@/plugins/axios'   // ✅ ใช้ axios ที่ผูก baseURL/Authorization ไว้
+import api from '@/plugins/axios'
 
 // ======= auth / owner =======
 const auth = useAuthStore()
-const ownerId = computed(() => (auth?.studentId || '').trim())  // รหัสนิสิตของคนล็อกอิน
+const ownerId = computed(() => (auth?.studentId || '').trim())
 
 // ======= state หลัก =======
 const open = defineModel('open', { type: Boolean, default: false })
@@ -18,10 +18,14 @@ const roomTypes = ref([]) // [{id,type_name}]
 const rooms = ref([])     // [{id,room_code,type_id,type_name}]
 
 const selectedTypeId = ref(null)
+
+// กรองห้องให้ robust (เผื่อได้ room_type_id มาจาก backend)
 const filteredRooms = computed(() => {
-  if (!selectedTypeId.value) return []
-  return rooms.value.filter(r => r.type_id === selectedTypeId.value)
+  const t = Number(selectedTypeId.value)
+  if (!t) return []
+  return rooms.value.filter(r => Number(r.type_id ?? r.room_type_id) === t)
 })
+
 const selectedRoomCode = ref('')
 
 // ========= เวลา (ชั่วโมงตรงเท่านั้น) =========
@@ -63,27 +67,37 @@ function syncOtherIds() {
   while (otherIds.value.length < need) otherIds.value.push('')
   while (otherIds.value.length > need) otherIds.value.pop()
 }
-
-// เรียกซิงค์เมื่อเปลี่ยนจำนวนสมาชิก
 watch(memberCount, syncOtherIds)
 
 function sanitizeId(s) {
   return String(s || '').replace(/\s+/g, '').trim()
 }
 function isValidStudentId(id) {
-  // ปรับรูปแบบตามจริงได้ ที่นี่กำหนด 8–10 หลักเป็นตัวเลข
   return /^\d{8,10}$/.test(id)
 }
 
 // ========= โหลด master data =========
 async function fetchRoomTypes() {
-  const { data } = await api.get('/room-types')         // GET /api/room-types
-  roomTypes.value = data
+  // รองรับทั้ง /room-types และ /rooms/types
+  try {
+    const { data } = await api.get('/room-types')
+    roomTypes.value = data
+  } catch {
+    const { data } = await api.get('/rooms/types')
+    roomTypes.value = data
+  }
 }
+
 async function fetchRoomsByType() {
   if (!selectedTypeId.value) { rooms.value = []; return }
-  const { data } = await api.get(`/rooms`, { params: { typeId: selectedTypeId.value } }) // GET /api/rooms?typeId=...
-  rooms.value = data
+  const { data } = await api.get('/rooms', { params: { typeId: selectedTypeId.value } })
+  // map ให้ได้ฟิลด์มาตรฐาน type_id เสมอ
+  rooms.value = (Array.isArray(data) ? data : []).map(r => ({
+    id: r.id,
+    room_code: r.room_code,
+    type_id: Number(r.type_id ?? r.room_type_id ?? selectedTypeId.value),
+    type_name: r.type_name ?? ''
+  }))
 }
 
 // reset เมื่อเปิดโมดัล
@@ -94,9 +108,9 @@ function resetForm() {
   startAt.value = ''
   endAt.value = ''
 
-  memberCount.value = 5          // ตั้งค่าเริ่ม
-  otherIds.value = []            // เคลียร์ช่อง
-  syncOtherIds()                 // ✅ ทำให้ขึ้น 4 ช่องทันที (เพราะรวมเจ้าของแล้วเป็น 5)
+  memberCount.value = 5
+  otherIds.value = []
+  syncOtherIds()
 }
 
 watch(open, async (v) => {
@@ -122,9 +136,7 @@ async function submit() {
   try {
     errorMsg.value = ''
 
-    if (!ownerId.value) {
-      throw new Error('ไม่พบรหัสนิสิตของผู้ใช้ กรุณาออกจากระบบและล็อกอินใหม่')
-    }
+    if (!ownerId.value) throw new Error('ไม่พบรหัสนิสิตของผู้ใช้ กรุณาออกจากระบบและล็อกอินใหม่')
     if (!selectedTypeId.value) throw new Error('กรุณาเลือกประเภทห้อง')
     if (!selectedRoomCode.value) throw new Error('กรุณาเลือกห้อง')
     if (!startAt.value || !endAt.value) throw new Error('กรุณาเลือกเวลาเริ่ม/สิ้นสุด')
@@ -133,31 +145,26 @@ async function submit() {
     const raw = [ownerId.value, ...otherIds.value]
     const cleaned = raw.map(sanitizeId)
 
-    // ตรวจช่องว่าง
-    if (cleaned.some((v) => !v)) {
-      throw new Error('กรุณากรอกรหัสนิสิตให้ครบตามจำนวนผู้ใช้')
-    }
+    if (cleaned.some((v) => !v)) throw new Error('กรุณากรอกรหัสนิสิตให้ครบตามจำนวนผู้ใช้')
 
-    // ตรวจรูปแบบ
     const bad = cleaned.find(id => !isValidStudentId(id))
     if (bad) throw new Error(`รูปแบบรหัสนิสิตไม่ถูกต้อง: ${bad}`)
 
-    // ตรวจซ้ำ และจำนวนต้องตรงกับ memberCount
     const unique = Array.from(new Set(cleaned))
     if (unique.length !== Number(memberCount.value)) {
       throw new Error('พบรหัสซ้ำกัน หรือจำนวนสมาชิกไม่ครบตามที่เลือก')
     }
 
-    // ✅ ให้ตรงกับ backend: routes/bookings.js ({ roomCode, startAt, endAt, members })
+    // ให้ตรงกับ backend: routes/bookings.js ({ roomCode, startAt, endAt, members })
     const payload = {
       roomCode: selectedRoomCode.value,
       startAt: `${date.value} ${startAt.value}:00`,
       endAt:   `${date.value} ${endAt.value}:00`,
-      members: unique               // รวมเจ้าของแล้ว
+      members: unique
     }
 
     loading.value = true
-    await api.post('/bookings', payload)   // POST /api/bookings (มี token จาก axios interceptor)
+    await api.post('/bookings', payload)
 
     open.value = false
     alert('จองสำเร็จ')
@@ -169,7 +176,7 @@ async function submit() {
 }
 
 onMounted(() => {
-  // เปิดหน้าแล้วจะยังไม่ยิง; รอเปิด modal ค่อยโหลด room-types
+  // รอเปิด modal ค่อยโหลด room-types
 })
 </script>
 
@@ -188,12 +195,13 @@ onMounted(() => {
 
       <div class="field">
         <label>กรุณาเลือกห้อง *</label>
-        <select v-model="selectedRoomCode" :disabled="!selectedTypeId">
+        <select v-model="selectedRoomCode" :disabled="!selectedTypeId || filteredRooms.length === 0">
           <option value="">กรุณาเลือกห้อง</option>
           <option v-for="r in filteredRooms" :key="r.id" :value="r.room_code">
             {{ r.room_code }}
           </option>
         </select>
+        <small v-if="selectedTypeId && filteredRooms.length === 0" class="hint">ไม่มีห้องในประเภทนี้</small>
       </div>
 
       <div class="field grid2">
@@ -261,4 +269,5 @@ select, input{ padding:10px 12px; border:1px solid #e5e7eb; border-radius:10px }
 .cancel{ background:#f3f4f6 }
 .ok{ background:#22c55e; color:white }
 .error{ color:#ef4444; font-weight:600; margin-top:6px }
+.hint{ color:#6b7280; font-size:12px; margin-top:4px }
 </style>
