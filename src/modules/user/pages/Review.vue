@@ -34,7 +34,7 @@ async function load () {
       page: page.value,
       pageSize: pageSize.value,
       room_id: roomId.value ?? undefined,
-      rating: selectedRating.value ?? undefined,  // ✅ ถ้า backend รองรับ จะได้เพจที่กรองแล้ว
+      rating: selectedRating.value ?? undefined,
     })
 
     const payload = res?.data ?? res ?? {}
@@ -54,7 +54,6 @@ async function load () {
         5: Number(s[5] ?? s['5'] ?? 0),
       }
     } else {
-      // fallback (จากข้อมูลที่โหลดในหน้านี้)
       const tmp = {1:0,2:0,3:0,4:0,5:0}
       for (const r of reviews.value) {
         const k = Number(r.rating) || 0
@@ -72,7 +71,6 @@ async function load () {
 /* เมื่อ submit รีวิวใหม่จากโมดอล */
 function onSubmitted (newRow) {
   if (!newRow) return
-  // ถ้าเลือกระบุดาวอยู่ แสดงเฉพาะถ้าตรงเงื่อนไข
   if (selectedRating.value == null || Number(newRow.rating) === selectedRating.value) {
     reviews.value.unshift(newRow)
   }
@@ -92,7 +90,7 @@ const visibleReviews = computed(() =>
     : reviews.value.filter(r => Number(r.rating) === selectedRating.value)
 )
 
-/* helper: ชื่อ/อักษรย่อ/วันที่ */
+/* helper */
 function displayName (r) { return r.display_name || r.created_by || 'ผู้ใช้' }
 function initials (r) {
   const name = displayName(r).toString().trim()
@@ -122,33 +120,37 @@ onMounted(load)
 
 <template>
   <section class="rv-page">
-    <!-- หัวเรื่อง + ปุ่มเขียนรีวิว -->
+    <!-- หัวเรื่อง (เอาปุ่มบน toolbar ออก) -->
     <div class="rv-toolbar">
       <h2 class="rv-title">รีวิวทั้งหมด</h2>
-      <button type="button" class="rv-btn rv-btn-primary" @click="showModal = true">
-        ✍️ เขียนรีวิว
-      </button>
     </div>
 
-    <!-- แถบตัวกรองแบบชิป -->
+    <!-- กรอบตัวกรอง + ปุ่มเขียนรีวิวแบบชิป -->
     <div class="rv-filter">
-      <button
-        class="chip"
-        :class="{ active: selectedRating === null }"
-        @click="setRating(null)"
-      >
-        ความคิดเห็นทั้งหมด
-      </button>
+      <div class="chips-left">
+        <button
+          class="chip"
+          :class="{ active: selectedRating === null }"
+          @click="setRating(null)"
+        >
+          ความคิดเห็นทั้งหมด
+        </button>
 
-      <button
-        v-for="n in [5,4,3,2,1]"
-        :key="n"
-        class="chip"
-        :class="{ active: selectedRating === n }"
-        @click="setRating(n)"
-      >
-        <span>{{ n }} ดาว</span>
-        <strong> ({{ stats[n] ?? 0 }})</strong>
+        <button
+          v-for="n in [5,4,3,2,1]"
+          :key="n"
+          class="chip"
+          :class="{ active: selectedRating === n }"
+          @click="setRating(n)"
+        >
+          <span>{{ n }} ดาว</span>
+          <strong> ({{ stats[n] ?? 0 }})</strong>
+        </button>
+      </div>
+
+      <!-- ปุ่มเขียนรีวิวอยู่ขวาสุดในกรอบ -->
+      <button type="button" class="chip chip-primary" @click="showModal = true">
+        ✍️ แสดงความคิดเห็นที่นี่
       </button>
     </div>
 
@@ -223,7 +225,7 @@ onMounted(load)
 .rv-error{ background:#fee2e2; color:#991b1b; border:1px solid #fecaca; padding:10px 12px; border-radius:10px; }
 .rv-empty{ text-align:center; color:var(--rv-muted); padding:24px 0; }
 
-/* ปุ่ม */
+/* ปุ่มทั่วไป (ใช้ในเพจจิเนชัน) */
 .rv-btn{
   display:inline-flex !important; align-items:center; justify-content:center; gap:8px;
   padding:10px 14px; border-radius:10px; border:1px solid var(--rv-border);
@@ -233,21 +235,24 @@ onMounted(load)
 }
 .rv-btn:hover{ transform:translateY(-1px); box-shadow:0 2px 8px rgba(0,0,0,.06); }
 .rv-btn:disabled{ opacity:.6; cursor:not-allowed; }
-.rv-btn-primary{ background:var(--rv-primary) !important; border-color:var(--rv-primary) !important; color:#fff !important; }
-.rv-btn, .rv-btn *{ color:inherit !important; font-size:14px !important; line-height:1 !important; text-indent:0 !important; visibility:visible !important; }
 .rv-btn::before, .rv-btn::after{ content:none !important; }
 
-/* ===== แถบตัวกรองแบบชิป (สไตล์คล้ายภาพตัวอย่าง) ===== */
+/* ===== แถบตัวกรองแบบชิป ===== */
 .rv-filter{
-  background: #fff8ee;   /* โทนครีมอุ่น */
-  border: 1px solid #fdebd1;
-  padding: 14px;
-  border-radius: 12px;
-  display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
-  align-items: center;
-  margin-bottom: 16px;
+  background:#fff8ee;
+  border:1px solid #fdebd1;
+  padding:14px;
+  border-radius:12px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;   /* ซ้าย=ชิปกรอง ขวา=ปุ่มเขียน */
+  gap:12px;
+  margin-bottom:16px;
+}
+.chips-left{
+  display:flex;
+  flex-wrap:wrap;
+  gap:16px;
 }
 .chip{
   background:#fff;
@@ -261,10 +266,27 @@ onMounted(load)
 .chip strong{ font-weight:700; }
 .chip:hover{ box-shadow:0 2px 8px rgba(0,0,0,.06); transform: translateY(-1px); }
 .chip.active{
-  outline:2px solid #4f46e5;   /* วงกรอบม่วงคราม */
+  outline:2px solid #4f46e5;
   outline-offset:0;
   border-color:#c7d2fe;
   color:#1f2a6b;
+}
+
+/* ปุ่มเขียนรีวิวแบบชิป (เด่นทางขวา) */
+.chip-primary{
+  border-color:#2563eb;
+  color:#1d4ed8;
+  box-shadow:0 0 0 2px rgba(37,99,235,.12);
+}
+.chip-primary:hover{
+  background:#eff6ff;
+  box-shadow:0 0 0 2px rgba(37,99,235,.22);
+}
+
+@media (max-width:640px){
+  .rv-toolbar{ flex-direction:column; align-items:flex-start; gap:10px; }
+  .rv-filter{ align-items:stretch; }
+  .chip-primary{ width:100%; text-align:center; }
 }
 
 /* การ์ดรายการ */
@@ -288,9 +310,4 @@ onMounted(load)
 
 .rv-pager{ display:flex; align-items:center; gap:10px; margin-top:14px; }
 .rv-muted{ color:var(--rv-muted); margin-left:auto; }
-
-@media (max-width:640px){
-  .rv-toolbar{ flex-direction:column; align-items:flex-start; gap:10px; }
-  .rv-filter{ gap:10px; }
-}
 </style>
