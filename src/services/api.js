@@ -15,6 +15,9 @@ export const getRooms = (params = {}) =>
 export const getRoomTypes = () =>
   api.get('/room-types')
 
+export const createRoom = (payload) => 
+  api.post('/rooms', payload)
+
 export const updateRoom = (id, payload) =>
   api.put(`/rooms/${id}`, payload)       // { room_code, room_type_id }
 
@@ -24,3 +27,6 @@ export const deleteRoom = (id) =>
 // (ถ้าชอบตั้งชื่อแบบ fetch*)
 export const fetchRooms = getRooms
 export const fetchRoomTypes = getRoomTypes
+
+// (ทางเลือก) helper กรองตามประเภท
+export const getRoomsByType = (typeId) => getRooms({ typeId })
