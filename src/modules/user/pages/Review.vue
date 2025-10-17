@@ -219,7 +219,12 @@ onMounted(load)
 }
 
 /* โครงหลัก */
-.rv-page{ max-width:960px; margin:24px auto; padding:0 16px; }
+.rv-page{
+  max-width:960px;
+  margin:24px auto;
+  padding:0 16px 88px;
+  box-sizing:border-box;
+}
 .rv-toolbar{ display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
 .rv-title{ font-size:22px; font-weight:700; color:var(--rv-text); }
 .rv-error{ background:#fee2e2; color:#991b1b; border:1px solid #fecaca; padding:10px 12px; border-radius:10px; }
