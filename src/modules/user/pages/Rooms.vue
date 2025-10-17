@@ -6,17 +6,20 @@ import BookingModal from '@/components/user/BookingModal.vue'
 
 const showBooking = ref(false)
 
-/* ===== เวลา ===== */
-const START_HOUR = 8
-const END_HOUR   = 16                 // เส้นขวาสุด = 16:00
-const HOUR_WIDTH = 140                // px ต่อ 1 ชั่วโมง
+/* ===== เวลา =====
+   - กำหนดเวลา *ธุรกิจจริง* (ปิดที่ 16:00) แยกกับเวลา *แสดงผล* (โชว์หัวตารางถึง 17:00)
+   - บล็อกที่จบ 16:00 จะ "ยืดภาพ" ไปชนเส้น 17:00 เท่านั้น */
+const START_HOUR        = 8   // เริ่ม 08:00
+const BUSINESS_END_HOUR = 16  // เวลาจริงที่อนุญาตใน DB
+const DISPLAY_END_HOUR  = 17  // เส้น/หัวตารางขวาสุดที่อยากให้เห็น
+const HOUR_WIDTH        = 140 // px ต่อ 1 ชั่วโมง
 
-// 08→16 = 8 ช่วงจริง, ทำ "แคนวาส" 9 คอลัมน์ (08..16) เพื่อให้ 16:00 มีช่องของตัวเอง
-const INTERVALS    = END_HOUR - START_HOUR          // 8
-const CANVAS_COLS  = INTERVALS + 1                  // 9
-const CANVAS_W     = computed(() => CANVAS_COLS * HOUR_WIDTH) // 9 * W
+// ช่วงเวลาเพื่อคำนวณแคนวาส (08..17)
+const DISPLAY_INTERVALS = DISPLAY_END_HOUR - START_HOUR   // 9 ชม.
+const CANVAS_COLS       = DISPLAY_INTERVALS + 1           // 10 คอลัมน์ (แถบกึ่งกลางชั่วโมง)
+const CANVAS_W          = computed(() => CANVAS_COLS * HOUR_WIDTH)
 
-// ป้ายหัว: จัดกึ่งกลางทุกคอลัมน์ (08..16 รวม 9 ป้าย)
+// ป้ายหัวชั่วโมง จัดกึ่งกลางแต่ละคอลัมน์ (08..17 รวม 10 ป้าย)
 const centerLabels = computed(() => {
   const list: { text: string; left: number }[] = []
   for (let i = 0; i < CANVAS_COLS; i++) {
@@ -54,7 +57,7 @@ async function loadData(){
 }
 onMounted(loadData)
 
-/* ===== คำนวณบล็อกจอง (ใช้ left/right พิกเซล บนแคนวาส 9 คอลัมน์) ===== */
+/* ===== คำนวณบล็อกจอง (คุม left/right เป็นพิกเซลบนแคนวาส 08..17) ===== */
 type Block = { id:number; label:string; left:number; right:number }
 
 function hhmmToHour(s?: string) {
@@ -81,26 +84,40 @@ const blocksByRoomId = computed<Record<number, Block[]>>(() => {
     const eHraw = toHourFloat(b.end_hhmm,   b.end_at)
     if (Number.isNaN(sHraw) || Number.isNaN(eHraw)) continue
 
-    // clip ให้อยู่ในช่วง 08–16
+    // 1) ตัดให้ไม่เกินช่วงธุรกิจจริง 08..16 (ข้อมูลจริงใน DB)
     let vStart = Math.max(START_HOUR, sHraw)
-    let vEnd   = Math.min(END_HOUR,   eHraw)
-    if (vEnd <= START_HOUR || vStart >= END_HOUR) continue
+    const vEndData = Math.min(BUSINESS_END_HOUR, eHraw)
+    if (vEndData <= START_HOUR || vStart >= BUSINESS_END_HOUR) continue
 
-    // (option) ถ้าจบตรงชั่วโมงพอดีให้กินไปถึงคอลัมน์ถัดไป (แต่ไม่เกิน 16:00)
-    const isOnHour = Math.abs(vEnd - Math.round(vEnd)) < 1e-6
-    if (isOnHour) vEnd = Math.min(END_HOUR, vEnd + 1)
+    // 2) กฎการ "ยืดภาพ":
+    //    - ถ้าจบตรงชั่วโมง และยังไม่ถึง 16:00 → ขยายถึงชั่วโมงถัดไป (เพื่อกินเต็มคอลัมน์)
+    //    - ถ้าจบที่ 16:00 → ขยาย "การแสดงผล" จนชน 17:00 (เฉพาะ UI)
+    const eps = 1e-6
+    const isOnHour = Math.abs(vEndData - Math.round(vEndData)) < eps
+    let vEndVisual = vEndData
+    if (isOnHour && vEndData < BUSINESS_END_HOUR) {
+      vEndVisual = vEndData + 1
+    } else if (Math.abs(vEndData - BUSINESS_END_HOUR) < eps) {
+      vEndVisual = DISPLAY_END_HOUR  // ยืดภาพ 16:00 → 17:00
+    }
 
-    const leftEdgePx  = (vStart - START_HOUR) * HOUR_WIDTH
-    const rightEdgePx = (vEnd   - START_HOUR) * HOUR_WIDTH
-
+    // 3) แปลงเป็นพิกเซลบนแคนวาส 08..17
+    const leftEdgePx  = (vStart      - START_HOUR) * HOUR_WIDTH
+    const rightEdgePx = (vEndVisual  - START_HOUR) * HOUR_WIDTH
     const left  = Math.max(0, Math.round(leftEdgePx))
-    const right = Math.max(0, Math.round(CANVAS_W.value - rightEdgePx)) // ใช้ CANVAS_W (9W)
+    const right = Math.max(0, Math.round(CANVAS_W.value - rightEdgePx))
 
+    // label
     const who = b.display_name ? `${b.display_name} ` : ''
-    const hh = (x:number)=>`${String(Math.floor(x)).padStart(2,'0')}:${String(Math.round((x%1)*60)).padStart(2,'0')}`
+    const hh = (x:number)=>{
+      const H = Math.floor(x)
+      const M = Math.round((x%1)*60)
+      return `${String(H).padStart(2,'0')}:${String(M).padStart(2,'0')}`
+    }
     const label = `${who}[${b.created_by}]  ${hh(sHraw)} - ${hh(eHraw)}`
 
-    ;(map[b.room_id] ||= []).push({ id:b.id, label, left, right })
+    if (!map[b.room_id]) map[b.room_id] = []
+    map[b.room_id].push({ id:b.id, label, left, right })
   }
   return map
 })
@@ -132,16 +149,16 @@ const blocksByRoomId = computed<Record<number, Block[]>>(() => {
       <div class="row header">
         <div class="cell room-col"></div>
         <div class="cell hours-bar" :style="{ width: CANVAS_W + 'px' }">
-          <!-- ป้ายกลางคอลัมน์ 08..16 -->
+          <!-- ป้ายกลางคอลัมน์ 08..17 -->
           <div v-for="(it, i) in centerLabels"
                :key="i"
                class="hlabel"
                :style="{ left: it.left + 'px' }">
             {{ it.text }}
           </div>
-          <!-- เส้น 08:00 และ 16:00 -->
+          <!-- เส้นซ้าย/ขวาสุด (08:00 / 17:00) -->
           <div class="edge edge-left"></div>
-          <div class="edge edge-right" :style="{ left: (INTERVALS * HOUR_WIDTH) + 'px' }"></div>
+          <div class="edge edge-right" :style="{ left: ((DISPLAY_INTERVALS) * HOUR_WIDTH) + 'px' }"></div>
         </div>
       </div>
 
@@ -149,10 +166,10 @@ const blocksByRoomId = computed<Record<number, Block[]>>(() => {
       <div class="row" v-for="r in rooms" :key="r.id">
         <div class="cell room-col room-code">{{ r.room_code }}</div>
 
-        <!-- แผงเวลา: กว้าง 9 คอลัมน์ -->
+        <!-- แผงเวลา: กว้างตามแคนวาส 08..17 -->
         <div class="cell time-grid" :style="{ width: CANVAS_W + 'px' }">
-          <!-- เส้นชั่วโมง 08..16 -->
-          <div v-for="i in (INTERVALS + 1)"
+          <!-- เส้นชั่วโมงแนวตั้ง 08..17 -->
+          <div v-for="i in (DISPLAY_INTERVALS + 1)"
                :key="'vl'+i"
                class="vline-abs"
                :style="{ left: ((i-1) * HOUR_WIDTH) + 'px' }" />
@@ -231,6 +248,7 @@ const blocksByRoomId = computed<Record<number, Block[]>>(() => {
 }
 .edge{ position:absolute; top:0; bottom:0; border-left:1px dashed #e5e7eb; }
 .edge-left{ left:0; }
+.edge-right{ } /* วาง left ด้วย inline-style */
 
 /* แผงเวลา */
 .time-grid{
