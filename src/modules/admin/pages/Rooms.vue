@@ -1,42 +1,47 @@
+<!-- src/modules/admin/pages/Rooms.vue -->
 <script setup>
 import { ref } from 'vue'
 import EditRoomModal from '@/components/admin/EditRoomModal.vue'
-import AddRoomModal from '@/components/admin/AddRoomModal.vue' 
+import AddRoomModal  from '@/components/admin/AddRoomModal.vue'
+
+/* ✅ ดึง "หน้า Rooms ของฝั่ง User" มาใช้ซ้ำ */
+import UserRooms from '@/modules/user/pages/Rooms.vue'
 
 const showEdit = ref(false)
-const showAdd  = ref(false)  
-// ถ้าคุณมีฟังก์ชันโหลดรายการห้องอยู่แล้ว ให้เรียกหลังแก้ไข/ลบเสร็จ
+const showAdd  = ref(false)
+
+/* ถ้าคุณมีฟังก์ชันโหลดรายการห้องอยู่แล้ว ให้เรียกหลังแก้ไข/ลบเสร็จ */
 const loadRooms = () => {
-  // ... โค้ดโหลดห้องเดิมของคุณ
+  // ... โค้ดโหลดห้องเดิมของคุณ (ถ้ามี)
 }
 </script>
 
 <template>
   <section class="p-6">
-    <h1 class="text-2xl font-bold mb-4">จองห้อง (แอดมิน)</h1>
-    <!-- TODO: ใส่ตาราง/ฟอร์มจองห้องของแอดมิน หรือรีใช้ของ user ชั่วคราว -->
-    <!-- <UserRooms admin-mode /> -->
-  </section>
-  <div class="toolbar">
-   <!-- ปุ่มเพิ่มห้อง (เขียว) -->
-    <button class="add-btn" @click="showAdd = true">
-      เพิ่มห้อง
-      <span class="pill">+</span>
-   </button>
-   <!-- ปุ่มแก้ไขห้อง (ของเดิม) -->
-   <button class="edit-btn" @click="showEdit = true">
-      แก้ไขห้อง
-      <span class="pill">+</span>
-   </button>
- </div>
+    <h1 class="text-2xl font-bold mb-4">จองห้อง (ผู้ดูแลระบบ)</h1>
 
-  <!-- รายการห้องของเดิมคุณ -->
-  <!-- โมดัลเพิ่มห้อง (ใหม่) -->
+    <!-- แถบเครื่องมือของแอดมิน -->
+    <div class="toolbar">
+      <button class="add-btn"  @click="showAdd = true">
+        เพิ่มห้อง <span class="pill">+</span>
+      </button>
+      <button class="edit-btn" @click="showEdit = true">
+        แก้ไขห้อง <span class="pill">+</span>
+      </button>
+    </div>
+
+    <!-- ✅ ใช้ตารางจองห้องของฝั่งผู้ใช้มาแสดงในหน้าแอดมิน -->
+    <!--    ถ้าใน Rooms.vue มีปุ่ม/ส่วนหัวที่ไม่อยากโชว์ในแอดมิน ให้ดูหัวข้อข้อ 2 ด้านล่าง -->
+    <div class="admin-embed">
+      <UserRooms :admin-mode="true" />
+    </div>
+  </section>
+
+  <!-- โมดัลเพิ่ม/แก้ไขห้อง -->
   <AddRoomModal
     v-model:open="showAdd"
-    @created="loadRooms"   
+    @created="loadRooms"
   />
-
   <EditRoomModal
     v-model:open="showEdit"
     @updated="loadRooms"
@@ -48,47 +53,42 @@ const loadRooms = () => {
 .toolbar {
   display: flex;
   justify-content: flex-end;
-  margin: 16px 0 8px;
+  gap: 10px;
+  margin: 16px 0 12px;
 }
-.add-btn{
+.add-btn, .edit-btn{
   display: inline-flex;
   align-items: center;
   gap: .5rem;
   font-weight: 700;
   border: none;
-  background: #7dfc90;       /* เขียวตามภาพตัวอย่าง */
   color: #111;
   padding: 10px 16px;
   border-radius: 12px;
   cursor: pointer;
   box-shadow: 0 4px 12px rgba(0,0,0,.12);
 }
-.add-btn:hover { filter: brightness(0.98); 
-}
+.add-btn{  background: #7dfc90; }
+.edit-btn{ background: #ffe169; }
+.add-btn:hover, .edit-btn:hover { filter: brightness(0.98); }
 
-.edit-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: .5rem;
-  font-weight: 700;
-  border: none;
-  background: #ffe169;          /* เหลืองนุ่มแบบภาพ */
-  color: #111;
-  padding: 10px 16px;
-  border-radius: 12px;
-  cursor: pointer;
-  box-shadow: 0 4px 12px rgba(0,0,0,.12);
-}
-.edit-btn:hover { filter: brightness(0.98); }
 .pill {
   display: inline-grid;
   place-items: center;
   width: 18px; height: 18px;
   border-radius: 50%;
-  background: #111;
-  color: #fff;
-  font-weight: 900;
-  line-height: 1;
+  background: #111; color: #fff;
+  font-weight: 900; line-height: 1;
 }
-</style>
 
+/* (ทางเลือก) ถ้าหน้า User มี Header/Toolbar ที่ไม่อยากโชว์ใน Admin
+   ใส่ deep selector ปิดได้ เช่น: */
+:deep(.user-rooms__topbar),
+:deep(.user-rooms__nav),
+:deep(.user-rooms__toolbar) {
+  display: none !important;
+}
+
+/* เพิ่มช่องว่างเพื่อไม่ให้ตารางชิดขอบล่าง */
+.admin-embed { padding-bottom: 64px; }
+</style>
