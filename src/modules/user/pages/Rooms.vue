@@ -20,6 +20,12 @@ const DISPLAY_INTERVALS = DISPLAY_END_HOUR - START_HOUR   // 9
 const CANVAS_COLS       = DISPLAY_INTERVALS + 1           // 10
 const CANVAS_W          = computed(() => CANVAS_COLS * HOUR_WIDTH)
 
+// ===== จำกัดจำนวนห้องที่มองเห็นทีละ 10 แถว (ที่เหลือเลื่อนลง) =====
+const ROW_HEIGHT    = 56   // ความสูงแถวห้อง (ให้ตรงกับ CSS)
+const HEADER_HEIGHT = 56   // ความสูงแถวหัวตาราง (ให้ตรงกับ CSS)
+const VISIBLE_ROOMS = 10   // แสดงทีละกี่ห้อง
+const SCHEDULE_H    = computed(() => HEADER_HEIGHT + ROW_HEIGHT * VISIBLE_ROOMS)
+
 const centerLabels = computed(() => {
   const list: { text: string; left: number }[] = []
   for (let i = 0; i < CANVAS_COLS; i++) {
@@ -114,7 +120,7 @@ const blocksByRoomId = computed<Record<number, Block[]>>(() => {
   return map
 })
 
-/* ===== หนีบการเลื่อนไม่ให้เห็น 17:00 ===== */
+/* ===== หนีบการเลื่อนไม่ให้เห็น 17:00 (แนวนอน) ===== */
 const scheduleRef = ref<HTMLDivElement | null>(null)
 function clampScrollRight() {
   const el = scheduleRef.value
@@ -128,7 +134,6 @@ onMounted(() => {
   if (!el) return
   el.addEventListener('scroll', clampScrollRight, { passive: true })
   window.addEventListener('resize', clampScrollRight)
-  // เรียก 1 ครั้ง เผื่อหน้าเริ่มด้วยการเลื่อนไปขวา
   requestAnimationFrame(clampScrollRight)
 })
 onUnmounted(() => {
@@ -159,7 +164,8 @@ onUnmounted(() => {
     </div>
 
     <!-- ตาราง -->
-    <div class="schedule" ref="scheduleRef">
+    <!-- ใส่ maxHeight ให้เห็นทีละ 10 ห้อง (+ แถวหัว) ส่วนที่เหลือเลื่อนลง -->
+    <div class="schedule" ref="scheduleRef" :style="{ maxHeight: SCHEDULE_H + 'px' }">
       <!-- HEADER -->
       <div class="row header">
         <div class="cell room-col"></div>
@@ -227,7 +233,7 @@ onUnmounted(() => {
   margin-top:14px;
   border:1px solid #e5e7eb;
   border-radius:10px;
-  overflow:auto; /* แนวนอนหนีบด้วย JS */
+  overflow:auto; /* ทั้งแนวนอนและแนวตั้ง */
 }
 
 /* โครง */
