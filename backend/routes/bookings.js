@@ -5,11 +5,51 @@ import { requireAuth } from '../middlewares/auth.js'
 
 const router = express.Router()
 
-// helper เล็กน้อย
-const sanitizeId = s => String(s || '').replace(/\s+/g, '').trim()
-const validStudentId = id => /^\d{8,10}$/.test(id) // ปรับรูปแบบตามจริงได้
+// =============================
+// GET /api/bookings?date=YYYY-MM-DD
+// ดึงรายการจองของวันนั้น พร้อมฟิลด์เวลาแบบ HH:MM (start_hhmm/end_hhmm)
+// เพื่อตัดปัญหา timezone ทางฝั่ง frontend
+// =============================
+router.get('/', async (req, res) => {
+  try {
+    const date = req.query.date || new Date().toISOString().slice(0, 10)
 
-// POST /api/bookings — เรียก SP: CreateBooking
+    const [rows] = await pool.query(
+      `SELECT
+         b.id, b.room_id, r.room_code,
+         b.start_at, b.end_at,
+         TIME_FORMAT(b.start_at, '%H:%i') AS start_hhmm,
+         TIME_FORMAT(b.end_at,   '%H:%i') AS end_hhmm,
+         b.created_by,
+         COALESCE(u.display_name, '') AS display_name
+       FROM bookings b
+       JOIN rooms r ON r.id = b.room_id
+       LEFT JOIN users u ON u.student_id = b.created_by
+       WHERE DATE(b.start_at) = ?
+       ORDER BY r.room_code, b.start_at`,
+      [date]
+    )
+
+    res.json(rows)
+  } catch (e) {
+    console.error(e)
+    res.status(500).json({ message: 'bookings list error' })
+  }
+})
+
+/*  หมายเหตุ:
+    ถ้าฐานข้อมูลเก็บเวลาเป็น UTC ให้เปลี่ยน 2 บรรทัด TIME_FORMAT เป็น:
+    TIME_FORMAT(CONVERT_TZ(b.start_at,'+00:00','+07:00'),'%H:%i') และแบบเดียวกันกับ end_at
+*/
+
+// ===== helper สำหรับ POST =====
+const sanitizeId = (s) => String(s || '').replace(/\s+/g, '').trim()
+const validStudentId = (id) => /^\d{8,10}$/.test(id) // ปรับรูปแบบตามจริงได้
+
+// =============================
+// POST /api/bookings
+// เรียก Stored Procedure: CreateBooking(room_code, start_at, end_at, created_by, members_json)
+// =============================
 router.post('/', requireAuth, async (req, res) => {
   try {
     const { roomCode, startAt, endAt, members } = req.body || {}
@@ -34,17 +74,19 @@ router.post('/', requireAuth, async (req, res) => {
     }
 
     // เช็กรูปแบบรหัสนิสิตเบื้องต้น
-    const bad = list.find(id => !validStudentId(id))
+    const bad = list.find((id) => !validStudentId(id))
     if (bad) {
       return res.status(400).json({ message: `รูปแบบรหัสนิสิตไม่ถูกต้อง: ${bad}` })
     }
 
     // เรียก Stored Procedure
-    // CreateBooking(room_code, start_at, end_at, created_by, members_json)
-    await pool.query(
-      'CALL CreateBooking(?, ?, ?, ?, ?)',
-      [roomCode, startAt, endAt, createdBy, JSON.stringify(list)]
-    )
+    await pool.query('CALL CreateBooking(?, ?, ?, ?, ?)', [
+      roomCode,
+      startAt,
+      endAt,
+      createdBy,
+      JSON.stringify(list),
+    ])
 
     return res.status(201).json({ ok: true })
   } catch (e) {
