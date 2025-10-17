@@ -17,11 +17,11 @@
         :class="{ active: isActive(['/user/rooms','/rooms','/']) }"
       >จองห้อง</RouterLink>
 
-      <RouterLink
-        to="/user/history"
-        class="tab-link"
-        :class="{ active: isActive(['/user/history','/history','/user/evidence','/evidence']) }"
-      >หลักฐานการจอง</RouterLink>
+
+        <div class="tab-link">
+          หลักฐานการจอง
+        </div>
+        
 
       <RouterLink
         to="/user/review"
