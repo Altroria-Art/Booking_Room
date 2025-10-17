@@ -6,13 +6,19 @@ import { requireAuth } from '../middlewares/auth.js'
 const router = express.Router()
 
 // =============================
-// GET /api/bookings?date=YYYY-MM-DD
-// ดึงรายการจองของวันนั้น พร้อมฟิลด์เวลาแบบ HH:MM (start_hhmm/end_hhmm)
-// เพื่อตัดปัญหา timezone ทางฝั่ง frontend
+// GET /api/bookings?date=YYYY-MM-DD[&roomCode=CE08203]
 // =============================
 router.get('/', async (req, res) => {
   try {
     const date = req.query.date || new Date().toISOString().slice(0, 10)
+    const roomCode = req.query.roomCode || null
+
+    // กัน cache
+    res.set('Cache-Control', 'no-store')
+
+    const params = [date]
+    const roomFilter = roomCode ? ' AND r.room_code = ? ' : ''
+    if (roomCode) params.push(roomCode)
 
     const [rows] = await pool.query(
       `SELECT
@@ -25,9 +31,9 @@ router.get('/', async (req, res) => {
        FROM bookings b
        JOIN rooms r ON r.id = b.room_id
        LEFT JOIN users u ON u.student_id = b.created_by
-       WHERE DATE(b.start_at) = ?
+       WHERE DATE(b.start_at) = ? ${roomFilter}
        ORDER BY r.room_code, b.start_at`,
-      [date]
+      params
     )
 
     res.json(rows)
@@ -37,18 +43,35 @@ router.get('/', async (req, res) => {
   }
 })
 
-/*  หมายเหตุ:
-    ถ้าฐานข้อมูลเก็บเวลาเป็น UTC ให้เปลี่ยน 2 บรรทัด TIME_FORMAT เป็น:
-    TIME_FORMAT(CONVERT_TZ(b.start_at,'+00:00','+07:00'),'%H:%i') และแบบเดียวกันกับ end_at
+/* ถ้า DB เก็บเป็น UTC:
+   TIME_FORMAT(CONVERT_TZ(b.start_at,'+00:00','+07:00'),'%H:%i')
+   และ WHERE DATE(CONVERT_TZ(b.start_at,'+00:00','+07:00')) = ?
 */
 
-// ===== helper สำหรับ POST =====
+// ===== helper =====
 const sanitizeId = (s) => String(s || '').replace(/\s+/g, '').trim()
-const validStudentId = (id) => /^\d{8,10}$/.test(id) // ปรับรูปแบบตามจริงได้
+const validStudentId = (id) => /^\d{8,10}$/.test(id)
+
+// ✅ หา conflict เฉพาะ “วันเดียวกัน”
+async function findConflictsByRoomCode(roomCode, startAt, endAt) {
+  const [rows] = await pool.query(
+    `SELECT
+       b.id, r.room_code,
+       DATE_FORMAT(b.start_at,'%H:%i') AS start_hhmm,
+       DATE_FORMAT(b.end_at,'%H:%i')   AS end_hhmm
+     FROM bookings b
+     JOIN rooms r ON r.id = b.room_id
+     WHERE r.room_code = ?
+       AND DATE(b.start_at) = DATE(?)
+       AND NOT (b.end_at <= ? OR b.start_at >= ?)
+     ORDER BY b.start_at`,
+    [roomCode, startAt, startAt, endAt]
+  )
+  return rows
+}
 
 // =============================
 // POST /api/bookings
-// เรียก Stored Procedure: CreateBooking(room_code, start_at, end_at, created_by, members_json)
 // =============================
 router.post('/', requireAuth, async (req, res) => {
   try {
@@ -58,28 +81,35 @@ router.post('/', requireAuth, async (req, res) => {
       return res.status(400).json({ message: 'invalid payload' })
     }
 
-    // ใช้ student_id ของผู้ล็อกอินเป็น owner/created_by
     const createdBy = sanitizeId(req.user?.student_id)
     if (!createdBy) {
       return res.status(400).json({ message: 'your account has no student_id' })
     }
 
-    // รวม owner เข้าไปเสมอ + ล้าง/ตัดซ้ำ
+    // รวม owner + ล้าง/ตัดซ้ำ
     let list = [createdBy, ...members.map(sanitizeId)].filter(Boolean)
     list = Array.from(new Set(list))
 
-    // เช็กจำนวน 5–10 คน (รวมเจ้าของ)
     if (list.length < 5 || list.length > 10) {
       return res.status(400).json({ message: 'จำนวนสมาชิกต้อง 5–10 คน (รวมเจ้าของ)' })
     }
 
-    // เช็กรูปแบบรหัสนิสิตเบื้องต้น
     const bad = list.find((id) => !validStudentId(id))
     if (bad) {
       return res.status(400).json({ message: `รูปแบบรหัสนิสิตไม่ถูกต้อง: ${bad}` })
     }
 
-    // เรียก Stored Procedure
+    // ✅ PRE-CHECK: lock date + รายละเอียดช่วงที่ชน
+    const conflicts = await findConflictsByRoomCode(roomCode, startAt, endAt)
+    if (conflicts.length) {
+      return res.status(409).json({
+        ok: false,
+        message: 'ช่วงเวลาที่เลือกชนกับการจองเดิม',
+        conflicts,
+      })
+    }
+
+    // เรียก Stored Procedure ให้ DB เป็นตัวตัดสินรอบสุดท้าย
     await pool.query('CALL CreateBooking(?, ?, ?, ?, ?)', [
       roomCode,
       startAt,
@@ -90,9 +120,9 @@ router.post('/', requireAuth, async (req, res) => {
 
     return res.status(201).json({ ok: true })
   } catch (e) {
-    // ส่งข้อความจาก SIGNAL/ข้อผิดพลาด DB ออกมาให้อ่านง่าย
     const msg = e?.sqlMessage || e?.message || 'server error'
-    return res.status(400).json({ ok: false, message: msg })
+    const status = /overlap/i.test(msg) ? 409 : 400
+    return res.status(status).json({ ok: false, message: msg })
   }
 })
 

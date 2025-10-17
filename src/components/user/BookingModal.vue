@@ -13,13 +13,15 @@ const open = defineModel('open', { type: Boolean, default: false })
 const loading = ref(false)
 const errorMsg = ref('')
 
+// 👉 emit ให้หน้า Rooms รับรู้เมื่อจองเสร็จ
+const emit = defineEmits(['success'])
+
 // ======= master data =======
-const roomTypes = ref([]) // [{id,type_name}]
-const rooms = ref([])     // [{id,room_code,type_id,type_name}]
+const roomTypes = ref([])
+const rooms = ref([])
 
 const selectedTypeId = ref(null)
 
-// กรองห้องให้ robust (เผื่อได้ room_type_id มาจาก backend)
 const filteredRooms = computed(() => {
   const t = Number(selectedTypeId.value)
   if (!t) return []
@@ -28,20 +30,23 @@ const filteredRooms = computed(() => {
 
 const selectedRoomCode = ref('')
 
-// ========= เวลา (ชั่วโมงตรงเท่านั้น) =========
+// ========= เวลา =========
+// ✅ ใช้วันที่แบบ LOCAL (เลิกใช้ toISOString() ที่เป็น UTC)
+function todayLocalYMD () {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+}
+
 const startAt = ref('')   // 'HH:MM'
 const endAt   = ref('')   // 'HH:MM'
-const date = ref(new Date().toISOString().slice(0,10)) // yyyy-mm-dd วันนี้
+const date    = ref(todayLocalYMD()) // yyyy-mm-dd วันนี้ (LOCAL)
 
-// 08:00..16:00 เป็นชั่วโมงตรง
 const hourOptions = computed(() => {
   const a = []
   for (let h = 8; h <= 16; h++) a.push(`${String(h).padStart(2,'0')}:00`)
   return a
 })
-// start เลือกได้ 08:00..15:00 (ต้องมี end อย่างน้อย +1 ชม.)
 const startOptions = computed(() => hourOptions.value.filter(t => t < '16:00'))
-// end เลือกได้ตั้งแต่ start+1h ถึง min(start+2h, 16:00)
 const endOptions = computed(() => {
   if (!startAt.value) return []
   const [h] = startAt.value.split(':').map(Number)
@@ -53,32 +58,23 @@ watch(startAt, () => {
   if (endAt.value && !endOptions.value.includes(endAt.value)) endAt.value = ''
 })
 
-// ========= จำนวนผู้ใช้ และรหัสนิสิต =========
-// memberCount = จำนวนสมาชิกทั้งหมด "รวมเจ้าของด้วย"
-const memberCount = ref(5) // default 5
+// ========= จำนวนผู้ใช้ =========
+const memberCount = ref(5)
 const othersNeeded = computed(() => Math.max(0, Number(memberCount.value || 0) - 1))
-
-// อาร์เรย์ “สมาชิกคนอื่น ๆ” ไม่รวมเจ้าของ
 const otherIds = ref([])
 
-// ✅ ซิงค์จำนวนช่องสมาชิกคนอื่น ๆ ให้เท่ากับ memberCount - 1
-function syncOtherIds() {
+function syncOtherIds () {
   const need = othersNeeded.value
   while (otherIds.value.length < need) otherIds.value.push('')
   while (otherIds.value.length > need) otherIds.value.pop()
 }
 watch(memberCount, syncOtherIds)
 
-function sanitizeId(s) {
-  return String(s || '').replace(/\s+/g, '').trim()
-}
-function isValidStudentId(id) {
-  return /^\d{8,10}$/.test(id)
-}
+function sanitizeId (s) { return String(s || '').replace(/\s+/g, '').trim() }
+function isValidStudentId (id) { return /^\d{8,10}$/.test(id) }
 
 // ========= โหลด master data =========
-async function fetchRoomTypes() {
-  // รองรับทั้ง /room-types และ /rooms/types
+async function fetchRoomTypes () {
   try {
     const { data } = await api.get('/room-types')
     roomTypes.value = data
@@ -88,10 +84,9 @@ async function fetchRoomTypes() {
   }
 }
 
-async function fetchRoomsByType() {
+async function fetchRoomsByType () {
   if (!selectedTypeId.value) { rooms.value = []; return }
   const { data } = await api.get('/rooms', { params: { typeId: selectedTypeId.value } })
-  // map ให้ได้ฟิลด์มาตรฐาน type_id เสมอ
   rooms.value = (Array.isArray(data) ? data : []).map(r => ({
     id: r.id,
     room_code: r.room_code,
@@ -100,14 +95,13 @@ async function fetchRoomsByType() {
   }))
 }
 
-// reset เมื่อเปิดโมดัล
-function resetForm() {
+// reset form เมื่อเปิดโมดัล
+function resetForm () {
   errorMsg.value = ''
   selectedTypeId.value = null
   selectedRoomCode.value = ''
   startAt.value = ''
   endAt.value = ''
-
   memberCount.value = 5
   otherIds.value = []
   syncOtherIds()
@@ -116,6 +110,8 @@ function resetForm() {
 watch(open, async (v) => {
   if (!v) return
   try {
+    // ✅ รีเซ็ตวันที่ให้เป็น “วันนี้ตาม local” ทุกครั้งที่เปิด
+    date.value = todayLocalYMD()
     resetForm()
     if (!roomTypes.value.length) await fetchRoomTypes()
   } catch (e) {
@@ -132,7 +128,7 @@ watch(selectedTypeId, async () => {
 })
 
 // ========= ส่งจอง =========
-async function submit() {
+async function submit () {
   try {
     errorMsg.value = ''
 
@@ -145,8 +141,7 @@ async function submit() {
     const raw = [ownerId.value, ...otherIds.value]
     const cleaned = raw.map(sanitizeId)
 
-    if (cleaned.some((v) => !v)) throw new Error('กรุณากรอกรหัสนิสิตให้ครบตามจำนวนผู้ใช้')
-
+    if (cleaned.some(v => !v)) throw new Error('กรุณากรอกรหัสนิสิตให้ครบตามจำนวนผู้ใช้')
     const bad = cleaned.find(id => !isValidStudentId(id))
     if (bad) throw new Error(`รูปแบบรหัสนิสิตไม่ถูกต้อง: ${bad}`)
 
@@ -155,7 +150,6 @@ async function submit() {
       throw new Error('พบรหัสซ้ำกัน หรือจำนวนสมาชิกไม่ครบตามที่เลือก')
     }
 
-    // ให้ตรงกับ backend: routes/bookings.js ({ roomCode, startAt, endAt, members })
     const payload = {
       roomCode: selectedRoomCode.value,
       startAt: `${date.value} ${startAt.value}:00`,
@@ -166,10 +160,19 @@ async function submit() {
     loading.value = true
     await api.post('/bookings', payload)
 
+    // แจ้งหน้า Rooms รีโหลด
+    emit('success')
     open.value = false
     alert('จองสำเร็จ')
   } catch (e) {
-    errorMsg.value = e?.response?.data?.message || e?.message || 'สร้างการจองไม่สำเร็จ'
+    // แปล error 409 (ชนเวลา) ให้เป็นข้อความอ่านง่าย
+    const res = e?.response
+    if (res?.status === 409 && Array.isArray(res?.data?.conflicts) && res.data.conflicts.length) {
+      const list = res.data.conflicts.map(it => `${it.start_hhmm}–${it.end_hhmm}`).join(', ')
+      errorMsg.value = `ช่วงเวลาที่เลือกชนกับการจองเดิม (${list})`
+    } else {
+      errorMsg.value = res?.data?.message || e?.message || 'สร้างการจองไม่สำเร็จ'
+    }
   } finally {
     loading.value = false
   }
@@ -229,7 +232,7 @@ onMounted(() => {
         <small>จำนวนนี้ “รวมเจ้าของผู้จอง ({{ ownerId || '—' }})” แล้ว</small>
       </div>
 
-      <!-- Owner (disabled) -->
+      <!-- Owner -->
       <div class="members">
         <label>รหัสนิสิต (เจ้าของผู้จอง)</label>
         <input :value="ownerId" disabled class="owner-input" />
