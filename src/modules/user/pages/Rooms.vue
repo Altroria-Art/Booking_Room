@@ -1,25 +1,25 @@
 <!-- src/modules/user/pages/Rooms.vue -->
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import ReviewRoom from '@/components/user/ReviewRoom.vue'
 import BookingModal from '@/components/user/BookingModal.vue'
 
 const showBooking = ref(false)
 
 /* ===== เวลา =====
-   - กำหนดเวลา *ธุรกิจจริง* (ปิดที่ 16:00) แยกกับเวลา *แสดงผล* (โชว์หัวตารางถึง 17:00)
-   - บล็อกที่จบ 16:00 จะ "ยืดภาพ" ไปชนเส้น 17:00 เท่านั้น */
-const START_HOUR        = 8   // เริ่ม 08:00
-const BUSINESS_END_HOUR = 16  // เวลาจริงที่อนุญาตใน DB
-const DISPLAY_END_HOUR  = 17  // เส้น/หัวตารางขวาสุดที่อยากให้เห็น
+   - เวลาจริง (DB) ปิด 16:00
+   - UI แสดงหัวถึง 17:00 เพื่อให้บล็อกที่จบ 16:00 ยืดภาพไปชน 17:00 ได้
+*/
+const START_HOUR        = 8
+const BUSINESS_END_HOUR = 16
+const DISPLAY_END_HOUR  = 17
 const HOUR_WIDTH        = 140 // px ต่อ 1 ชั่วโมง
 
-// ช่วงเวลาเพื่อคำนวณแคนวาส (08..17)
-const DISPLAY_INTERVALS = DISPLAY_END_HOUR - START_HOUR   // 9 ชม.
-const CANVAS_COLS       = DISPLAY_INTERVALS + 1           // 10 คอลัมน์ (แถบกึ่งกลางชั่วโมง)
+// ช่วงโชว์หัว 08..17
+const DISPLAY_INTERVALS = DISPLAY_END_HOUR - START_HOUR   // 9
+const CANVAS_COLS       = DISPLAY_INTERVALS + 1           // 10
 const CANVAS_W          = computed(() => CANVAS_COLS * HOUR_WIDTH)
 
-// ป้ายหัวชั่วโมง จัดกึ่งกลางแต่ละคอลัมน์ (08..17 รวม 10 ป้าย)
 const centerLabels = computed(() => {
   const list: { text: string; left: number }[] = []
   for (let i = 0; i < CANVAS_COLS; i++) {
@@ -57,7 +57,7 @@ async function loadData(){
 }
 onMounted(loadData)
 
-/* ===== คำนวณบล็อกจอง (คุม left/right เป็นพิกเซลบนแคนวาส 08..17) ===== */
+/* ===== คำนวณบล็อกจอง ===== */
 type Block = { id:number; label:string; left:number; right:number }
 
 function hhmmToHour(s?: string) {
@@ -84,42 +84,57 @@ const blocksByRoomId = computed<Record<number, Block[]>>(() => {
     const eHraw = toHourFloat(b.end_hhmm,   b.end_at)
     if (Number.isNaN(sHraw) || Number.isNaN(eHraw)) continue
 
-    // 1) ตัดให้ไม่เกินช่วงธุรกิจจริง 08..16 (ข้อมูลจริงใน DB)
+    // 1) จำกัดตามเวลาจริง 08..16
     let vStart = Math.max(START_HOUR, sHraw)
     const vEndData = Math.min(BUSINESS_END_HOUR, eHraw)
     if (vEndData <= START_HOUR || vStart >= BUSINESS_END_HOUR) continue
 
-    // 2) กฎการ "ยืดภาพ":
-    //    - ถ้าจบตรงชั่วโมง และยังไม่ถึง 16:00 → ขยายถึงชั่วโมงถัดไป (เพื่อกินเต็มคอลัมน์)
-    //    - ถ้าจบที่ 16:00 → ขยาย "การแสดงผล" จนชน 17:00 (เฉพาะ UI)
+    // 2) ยืดภาพ: ชั่วโมงถัดไป / หรือ 16:00 → 17:00
     const eps = 1e-6
     const isOnHour = Math.abs(vEndData - Math.round(vEndData)) < eps
     let vEndVisual = vEndData
     if (isOnHour && vEndData < BUSINESS_END_HOUR) {
       vEndVisual = vEndData + 1
     } else if (Math.abs(vEndData - BUSINESS_END_HOUR) < eps) {
-      vEndVisual = DISPLAY_END_HOUR  // ยืดภาพ 16:00 → 17:00
+      vEndVisual = DISPLAY_END_HOUR
     }
 
-    // 3) แปลงเป็นพิกเซลบนแคนวาส 08..17
-    const leftEdgePx  = (vStart      - START_HOUR) * HOUR_WIDTH
-    const rightEdgePx = (vEndVisual  - START_HOUR) * HOUR_WIDTH
+    // 3) พิกัดพิกเซลบนแคนวาส 08..17
+    const leftEdgePx  = (vStart     - START_HOUR) * HOUR_WIDTH
+    const rightEdgePx = (vEndVisual - START_HOUR) * HOUR_WIDTH
     const left  = Math.max(0, Math.round(leftEdgePx))
     const right = Math.max(0, Math.round(CANVAS_W.value - rightEdgePx))
 
-    // label
     const who = b.display_name ? `${b.display_name} ` : ''
-    const hh = (x:number)=>{
-      const H = Math.floor(x)
-      const M = Math.round((x%1)*60)
-      return `${String(H).padStart(2,'0')}:${String(M).padStart(2,'0')}`
-    }
+    const hh = (x:number)=>`${String(Math.floor(x)).padStart(2,'0')}:${String(Math.round((x%1)*60)).padStart(2,'0')}`
     const label = `${who}[${b.created_by}]  ${hh(sHraw)} - ${hh(eHraw)}`
 
-    if (!map[b.room_id]) map[b.room_id] = []
-    map[b.room_id].push({ id:b.id, label, left, right })
+    ;(map[b.room_id] ||= []).push({ id:b.id, label, left, right })
   }
   return map
+})
+
+/* ===== หนีบการเลื่อนไม่ให้เห็น 17:00 ===== */
+const scheduleRef = ref<HTMLDivElement | null>(null)
+function clampScrollRight() {
+  const el = scheduleRef.value
+  if (!el) return
+  // ไม่ให้เลื่อนไปเห็นคอลัมน์สุดท้าย (17:00) → กันไว้เท่ากับความกว้าง 1 ชั่วโมง
+  const maxAllowed = Math.max(0, el.scrollWidth - el.clientWidth - HOUR_WIDTH)
+  if (el.scrollLeft > maxAllowed) el.scrollLeft = maxAllowed
+}
+onMounted(() => {
+  const el = scheduleRef.value
+  if (!el) return
+  el.addEventListener('scroll', clampScrollRight, { passive: true })
+  window.addEventListener('resize', clampScrollRight)
+  // เรียก 1 ครั้ง เผื่อหน้าเริ่มด้วยการเลื่อนไปขวา
+  requestAnimationFrame(clampScrollRight)
+})
+onUnmounted(() => {
+  const el = scheduleRef.value
+  if (el) el.removeEventListener('scroll', clampScrollRight)
+  window.removeEventListener('resize', clampScrollRight)
 })
 </script>
 
@@ -144,7 +159,7 @@ const blocksByRoomId = computed<Record<number, Block[]>>(() => {
     </div>
 
     <!-- ตาราง -->
-    <div class="schedule">
+    <div class="schedule" ref="scheduleRef">
       <!-- HEADER -->
       <div class="row header">
         <div class="cell room-col"></div>
@@ -212,7 +227,7 @@ const blocksByRoomId = computed<Record<number, Block[]>>(() => {
   margin-top:14px;
   border:1px solid #e5e7eb;
   border-radius:10px;
-  overflow:auto;
+  overflow:auto; /* แนวนอนหนีบด้วย JS */
 }
 
 /* โครง */
