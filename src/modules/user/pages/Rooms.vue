@@ -214,7 +214,7 @@ onUnmounted(() => {
 
 <style scoped>
 /* layout */
-.rooms{ max-width:1200px; margin:0 auto; padding:0 20px; }
+.rooms{ max-width:1200px; margin:0 auto; padding:0 20px 80px; }
 .page-title{ position:relative; display:inline-flex; align-items:baseline; gap:.5rem; padding-left:14px; margin:8px 0 12px; }
 .page-title::before{ content:''; position:absolute; left:0; top:2px; bottom:-4px; width:4px; border-radius:2px; background:#5b6acf; }
 .page-title .th,.page-title .en{ line-height:1.16; font-size:1.55rem; }
