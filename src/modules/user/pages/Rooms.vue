@@ -51,17 +51,33 @@ function todayLocalYMD(){
 
 const rooms = ref<Room[]>([])
 const bookings = ref<Booking[]>([])
+let midnightTimer: number | null = null // ✅ ตั้งเวลา reload หลังข้ามวัน
 
 async function loadData(){
   const ymd = todayLocalYMD()
+  const bust = Date.now() // ✅ กัน cache
   const [r1, r2] = await Promise.all([
-    fetch('/api/rooms').then(r=>r.json()),
-    fetch(`/api/bookings?date=${ymd}`).then(r=>r.json()),
+    fetch('/api/rooms', { cache: 'no-store' }).then(r=>r.json()),
+    fetch(`/api/bookings?date=${ymd}&_=${bust}`, { cache: 'no-store' }).then(r=>r.json()),
   ])
   rooms.value = r1
   bookings.value = r2
 }
-onMounted(loadData)
+
+function scheduleMidnightReload(){       // ✅ โหลดใหม่อัตโนมัติหลังเที่ยงคืน
+  if (midnightTimer) window.clearTimeout(midnightTimer)
+  const now  = new Date()
+  const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 1, 0) // 00:01
+  midnightTimer = window.setTimeout(async () => {
+    await loadData()
+    scheduleMidnightReload()
+  }, next.getTime() - now.getTime())
+}
+
+onMounted(async () => {                  // ✅ โหลดรอบแรก + ตั้งจับข้ามวัน
+  await loadData()
+  scheduleMidnightReload()
+})
 
 /* ===== คำนวณบล็อกจอง ===== */
 type Block = { id:number; label:string; left:number; right:number }
@@ -114,7 +130,6 @@ const blocksByRoomId = computed<Record<number, Block[]>>(() => {
     const who = b.display_name ? `${b.display_name} ` : ''
     const hh = (x:number)=>`${String(Math.floor(x)).padStart(2,'0')}:${String(Math.round((x%1)*60)).padStart(2,'0')}`
     const label = `${who}[${b.created_by}]  ${hh(sHraw)} - ${hh(eHraw)}`
-
     ;(map[b.room_id] ||= []).push({ id:b.id, label, left, right })
   }
   return map
@@ -140,7 +155,13 @@ onUnmounted(() => {
   const el = scheduleRef.value
   if (el) el.removeEventListener('scroll', clampScrollRight)
   window.removeEventListener('resize', clampScrollRight)
+  if (midnightTimer) window.clearTimeout(midnightTimer)
 })
+
+/* ✅ reload หลังจองสำเร็จ */
+async function handleBooked() {
+  await loadData()
+}
 </script>
 
 <template>
@@ -207,7 +228,8 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <BookingModal v-model:open="showBooking" />
+    <!-- ✅ ฟังอีเวนต์ success เพื่อรีโหลด -->
+    <BookingModal v-model:open="showBooking" @success="handleBooked" />
     <ReviewRoom />
   </div>
 </template>
