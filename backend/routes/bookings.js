@@ -8,7 +8,6 @@ const router = express.Router()
 // =============================
 // GET /api/bookings?date=YYYY-MM-DD
 // ดึงรายการจองของวันนั้น พร้อมฟิลด์เวลาแบบ HH:MM (start_hhmm/end_hhmm)
-// เพื่อตัดปัญหา timezone ทางฝั่ง frontend
 // =============================
 router.get('/', async (req, res) => {
   try {
@@ -37,14 +36,14 @@ router.get('/', async (req, res) => {
   }
 })
 
-/*  หมายเหตุ:
-    ถ้าฐานข้อมูลเก็บเวลาเป็น UTC ให้เปลี่ยน 2 บรรทัด TIME_FORMAT เป็น:
-    TIME_FORMAT(CONVERT_TZ(b.start_at,'+00:00','+07:00'),'%H:%i') และแบบเดียวกันกับ end_at
+/* ถ้าฐานข้อมูลเก็บเวลาเป็น UTC:
+   เปลี่ยน TIME_FORMAT(b.start_at, ...) เป็น
+   TIME_FORMAT(CONVERT_TZ(b.start_at,'+00:00','+07:00'),'%H:%i') (และเช่นเดียวกับ end_at)
 */
 
 // ===== helper สำหรับ POST =====
 const sanitizeId = (s) => String(s || '').replace(/\s+/g, '').trim()
-const validStudentId = (id) => /^\d{8,10}$/.test(id) // ปรับรูปแบบตามจริงได้
+const validStudentId = (id) => /^\d{8,10}$/.test(id) // ปรับตามรูปแบบจริงได้
 
 // =============================
 // POST /api/bookings
@@ -90,9 +89,72 @@ router.post('/', requireAuth, async (req, res) => {
 
     return res.status(201).json({ ok: true })
   } catch (e) {
-    // ส่งข้อความจาก SIGNAL/ข้อผิดพลาด DB ออกมาให้อ่านง่าย
     const msg = e?.sqlMessage || e?.message || 'server error'
     return res.status(400).json({ ok: false, message: msg })
+  }
+})
+
+// =============================
+// NEW: GET /api/bookings/me/active
+// ดึงการจองที่ "ยังไม่หมดเวลา" ล่าสุดของผู้ใช้ปัจจุบัน
+// =============================
+router.get('/me/active', requireAuth, async (req, res) => {
+  const sid = req.user.student_id
+  try {
+    const [rows] = await pool.query(
+      `SELECT b.id, b.room_id, r.room_code, b.start_at, b.end_at, rt.type_name
+       FROM bookings b
+       JOIN rooms r      ON r.id = b.room_id
+       JOIN room_types rt ON rt.id = r.room_type_id
+       WHERE b.created_by = ?
+         AND b.end_at >= UTC_TIMESTAMP()   -- ถ้าเก็บเวลาท้องถิ่น ให้เปลี่ยนเป็น NOW()
+       ORDER BY b.start_at DESC
+       LIMIT 1`,
+      [sid]
+    )
+
+    if (!rows.length) return res.status(404).json({ message: 'no active booking' })
+
+    const booking = rows[0]
+    const [members] = await pool.query(
+      `SELECT student_id FROM booking_members WHERE booking_id = ? ORDER BY id ASC`,
+      [booking.id]
+    )
+
+    return res.json({
+      id: booking.id,
+      room_id: booking.room_id,
+      room_code: booking.room_code,
+      start_at: booking.start_at,
+      end_at: booking.end_at,
+      room_type_name: booking.type_name,
+      members: members.map(m => m.student_id),
+    })
+  } catch (err) {
+    console.error(err)
+    return res.status(500).json({ message: 'failed to get booking' })
+  }
+})
+
+// =============================
+// NEW: DELETE /api/bookings/:id
+// ยกเลิก/ลบการจองของตัวเอง (FK CASCADE จะลบ booking_members ให้อัตโนมัติ)
+// =============================
+router.delete('/:id', requireAuth, async (req, res) => {
+  const sid = req.user.student_id
+  const id = req.params.id
+  try {
+    const [result] = await pool.query(
+      `DELETE FROM bookings WHERE id = ? AND created_by = ?`,
+      [id, sid]
+    )
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'booking not found' })
+    }
+    return res.status(204).send()
+  } catch (err) {
+    console.error(err)
+    return res.status(500).json({ message: 'failed to cancel booking' })
   }
 })
 

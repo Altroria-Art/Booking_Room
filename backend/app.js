@@ -9,6 +9,8 @@ import bookingsRoute from './routes/bookings.js'
 import reviewsRoute from './routes/reviews.js'
 import roomsRoute from './routes/rooms.js'      // 🆕 เพิ่ม router สำหรับประเภทห้อง/ห้อง
 
+import api from '@/plugins/axios'
+
 const app = express()
 
 // อนุญาต origin จาก .env (รองรับคอมมาแยกหลายโดเมน)
@@ -47,3 +49,7 @@ const port = Number(process.env.PORT || 3000)
 app.listen(port, () => {
   console.log(`API listening on http://localhost:${port}`)
 })
+
+// หลักฐานการจองของฉัน (เลือกส่ง date ได้)
+export const fetchMyBookingProof = (params = {}) =>
+  api.get('/bookings/my-proof', { params })

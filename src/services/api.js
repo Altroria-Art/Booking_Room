@@ -1,6 +1,11 @@
 // src/services/api.js
 import api from '@/plugins/axios'   // ถ้าไม่ได้ตั้ง alias '@' ให้เปลี่ยนเป็น '../plugins/axios'
 
+export const getMyActiveBooking = () =>
+  api.get('/bookings/me/active').then(r => r)
+
+export const cancelMyBooking = (bookingId) =>
+  api.delete(`/bookings/${bookingId}`).then(r => r)
 /* ---------- Reviews (ของเดิม) ---------- */
 export const fetchReviews = (params = {}) =>
   api.get('/reviews', { params })       // { page, pageSize, room_id }
