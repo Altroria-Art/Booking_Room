@@ -3,8 +3,8 @@
 import api from '@/plugins/axios'
 
 /* ========= helpers กันแคช ========= */
-const stamp  = (params = {}) => ({ ...params, _: Date.now() }) // แนบ time-stamp ทุกครั้ง
-const noStore = { headers: { 'Cache-Control': 'no-store', 'Pragma': 'no-cache' } }
+export const stamp   = (params = {}) => ({ ...params, _: Date.now() }) // แนบ time-stamp ทุกครั้ง
+export const noStore = { headers: { 'Cache-Control': 'no-store', 'Pragma': 'no-cache' } }
 
 /* ===================================
  * ROOM TYPES
@@ -52,10 +52,11 @@ export const fetchReviews         = (params = {}) => api.get('/reviews', { param
 export const createReview         = (payload)      => api.post('/reviews', payload)   // { rating, comment, created_by, room_id? }
 
 /* ===================================
- * ADMIN: Reviews / Bookings (ถ้ามี)
+ * ADMIN: Reviews / Bookings
  * ===================================*/
-export const getAdminReviews        = (params = {}) => api.get('/reviews/admin', { params })      // { page, pageSize, room_id?, rating? }
+export const getAdminReviews        = (params = {}) => api.get('/reviews/admin', { params })           // { page, pageSize, room_id?, rating? }
 export const getAdminReviewSummary  = (params = {}) => api.get('/reviews/admin/summary', { params })
+export const deleteAdminReview      = (id)            => api.delete(`/reviews/admin/${id}`)
 export const getAdminBookings       = (params = {}) => api.get('/bookings/admin', { params })
 
 /* ===================================
@@ -79,5 +80,5 @@ export default {
   fetchReviews, createReview,
 
   // admin
-  getAdminReviews, getAdminReviewSummary, getAdminBookings,
+  getAdminReviews, getAdminReviewSummary, deleteAdminReview, getAdminBookings,
 }

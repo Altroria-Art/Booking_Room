@@ -1,18 +1,21 @@
+<!-- src/components/admin/HeroSectionAdmin.vue -->
 <script setup>
-import { RouterLink, useRoute } from 'vue-router'
-const route = useRoute()
+import { useRouter, useRoute } from 'vue-router'
+const router = useRouter()
+const route  = useRoute()
 
-// เช็ค active ได้ทั้งจากชื่อ route และสำรองด้วย path
 const isActive = (name, startsWithPath) =>
   route.name === name || (startsWithPath && route.path.startsWith(startsWithPath))
+
+function go(name) {
+  router.push({ name }).catch(() => {}) // กัน error duplicate nav
+}
 </script>
 
 <template>
   <section class="hero">
-    <!-- รูปพื้นหลัง -->
     <img class="hero-img" src="/src/img/image 9.svg" alt="hero" />
 
-    <!-- ข้อความซ้อนบนรูป -->
     <div class="overlay">
       <h2 class="subtitle">
         โปรแกรมจองห้อง ศูนย์บรรณสารและการเรียนรู้ สถาบันนวัตกรรมการเรียนรู้
@@ -20,24 +23,23 @@ const isActive = (name, startsWithPath) =>
       <h1 class="title">มหาวิทยาลัยพะเยา</h1>
     </div>
 
-    <!-- ปุ่ม -->
     <div class="overlay-buttons">
-      <RouterLink
-        :to="{ name: 'admin.rooms' }"
-        class="tab-link"
+      <!-- ใช้ทั้ง href (router.resolve) + คลิกแบบโปรแกรม -->
+      <a
+        class="tab-btn"
         :class="{ active: isActive('admin.rooms', '/admin/rooms') }"
-      >
-        จองห้อง
-      </RouterLink>
+        :href="router.resolve({ name: 'admin.rooms' }).href"
+        @click.prevent="go('admin.rooms')"
+        role="button"
+      >จองห้อง</a>
 
-      <!-- ✅ แก้ให้ลิงก์ไปหน้ารีวิวของแอดมิน -->
-      <RouterLink
-        :to="{ name: 'admin.reviews' }"
-        class="tab-link"
+      <a
+        class="tab-btn"
         :class="{ active: isActive('admin.reviews', '/admin/reviews') }"
-      >
-        รีวิว
-      </RouterLink>
+        :href="router.resolve({ name: 'admin.reviews' }).href"
+        @click.prevent="go('admin.reviews')"
+        role="button"
+      >รีวิว</a>
     </div>
   </section>
 </template>
@@ -50,12 +52,22 @@ const isActive = (name, startsWithPath) =>
   margin: 20px auto;
   overflow: hidden;
   border-radius: 34px;
+  z-index: 40;
+  isolation: isolate; /* สร้าง stacking context ของตัวเอง */
 }
+
+/* รูปไม่กินคลิก */
 .hero-img {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
+  z-index: 0;
+  pointer-events: none;
 }
+
+/* ข้อความบนรูป “ไม่รับคลิก” กันบังปุ่ม */
 .overlay {
   position: absolute;
   inset: 0;
@@ -66,7 +78,10 @@ const isActive = (name, startsWithPath) =>
   padding: 80px 100px;
   text-align: left;
   color: white;
+  z-index: 20;
+  pointer-events: none;
 }
+
 .subtitle { font-size: 24px; font-weight: 400; margin-bottom: 5px; }
 .title    { font-size: 65px; font-weight: 700; margin: 0; line-height: 1.2; }
 
@@ -79,8 +94,12 @@ const isActive = (name, startsWithPath) =>
   display: flex;
   gap: 0;
   width: 300px;
+
+  z-index: 99;                  /* สูงกว่าทุกอย่างในหน้า */
+  pointer-events: auto;         /* ปุ่มภายในคลิกได้ */
 }
-.tab-link {
+
+.tab-btn {
   flex: 1;
   text-align: center;
   padding: 12px 0;
@@ -93,11 +112,12 @@ const isActive = (name, startsWithPath) =>
   backdrop-filter: blur(2px);
   transition: background .15s ease, color .15s ease, box-shadow .15s ease;
   text-decoration: none;
+  user-select: none;
 }
-.tab-link:hover{ background: rgba(15,23,42,.6); }
-.tab-link:first-child{ border-top-left-radius: 10px; }
-.tab-link:last-child { border-top-right-radius: 10px; }
-.tab-link.active{
+.tab-btn:hover{ background: rgba(15,23,42,.6); }
+.tab-btn:first-child{ border-top-left-radius: 10px; }
+.tab-btn:last-child { border-top-right-radius: 10px; }
+.tab-btn.active{
   background: #ffffff;
   color: #111827;
   border-color: #ffffff;
