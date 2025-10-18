@@ -1,15 +1,15 @@
-<!-- src/components/user/BookingProofModal.vue -->
 <script setup>
 import { ref, computed, watch } from 'vue'
+import { useRouter } from 'vue-router'              // ✅ เพิ่มบรรทัดนี้
 import { useAuthStore } from '@/store/auth'
-// เปลี่ยนมาใช้ fetchMyBooking (ของวันนี้) แทน fetchMyLatestBooking
 import { fetchMyBooking, cancelBooking } from '@/services/api'
+
+const router = useRouter()                           // ✅ เพิ่มบรรทัดนี้
+const HOME_PATH = '/user/rooms'                      // ✅ เปลี่ยนเป็น '/' ได้ตามต้องการ
 
 const props = defineProps({
   open: { type: Boolean, default: false },
-  // ถ้าไม่ส่งมา จะใช้วันที่วันนี้อัตโนมัติ (YYYY-MM-DD)
   date: { type: String, default: '' },
-  // ถ้าต้องการให้กรองเฉพาะห้องที่กำลังดูอยู่ ให้ส่ง roomCode; ไม่ส่งคือไม่กรอง
   roomCode: { type: String, default: '' },
 })
 const emit = defineEmits(['update:open', 'close'])
@@ -17,10 +17,9 @@ const emit = defineEmits(['update:open', 'close'])
 const auth = useAuthStore()
 
 const loading = ref(false)
-const notFound = ref(false)   // วันนี้ยังไม่มีการจองของ user
-const booking = ref(null)     // รายการจองของ user (ควรมีได้อย่างมาก 1 จากกฎ 1 วัน/1 ครั้ง)
+const notFound = ref(false)
+const booking = ref(null)
 
-// ใช้วันที่วันนี้ถ้าไม่ส่งมา
 const dateStr = computed(() =>
   props.date && /^\d{4}-\d{2}-\d{2}$/.test(props.date)
     ? props.date
@@ -46,13 +45,9 @@ const load = async () => {
       date: dateStr.value,
       ...(props.roomCode ? { roomCode: props.roomCode } : {})
     })
-    // รองรับได้ทั้งรูปแบบ { ok, data } หรือคืน object ตรง ๆ
     const rec = data?.data ?? data ?? null
-    if (!rec || !rec.id) {
-      notFound.value = true
-    } else {
-      booking.value = rec   // { id, room_code, start_hhmm, end_hhmm, start_at?, end_at?, members? }
-    }
+    if (!rec || !rec.id) notFound.value = true
+    else booking.value = rec
   } catch (e) {
     notFound.value = true
   } finally {
@@ -60,25 +55,32 @@ const load = async () => {
   }
 }
 
-// โหลดเมื่อเปิดโมดัล หรือเมื่อวันที่/ห้องเปลี่ยนตอนที่โมดัลเปิดอยู่
 watch(
   () => [props.open, dateStr.value, props.roomCode],
   ([isOpen]) => { if (isOpen) load() }
 )
 
-async function onCancelBooking() {
-  if (!booking.value) return
+async function onCancelBooking() {                    // ✅ แก้ฟังก์ชันนี้
+  if (!booking.value || loading.value) return
   if (!confirm('ยืนยันยกเลิกการจอง?')) return
+  loading.value = true
   try {
     await cancelBooking(booking.value.id)
-    booking.value = null
-    notFound.value = true
-    alert('ยกเลิกการจองสำเร็จ')
+    // ปิดโมดัลก่อน
+    emit('update:open', false)
+    emit('close')
+    // นำทางไปหน้าแรก
+    await router.push(HOME_PATH)
+    // รีเฟรชทั้งหน้าให้ state/timetable เคลียร์แน่นอน
+    window.location.reload()
   } catch (e) {
     alert('ยกเลิกไม่สำเร็จ: ' + (e?.response?.data?.error || e.message))
+  } finally {
+    loading.value = false
   }
 }
 </script>
+
 
 <template>
   <div v-if="props.open" class="modal-backdrop" @click.self="close">
