@@ -1,6 +1,9 @@
 // src/services/api.js
 import api from '@/plugins/axios'   // ถ้าไม่ได้ตั้ง alias '@' ให้เปลี่ยนเป็น '../plugins/axios'
 
+export const fetchMyBooking = (params = {}) =>
+  api.get('/bookings/my', { params })   // { date, roomCode? }
+
 export const fetchMyBookingToday = (date) =>
   api.get('/bookings/my', { params: { date } })
 

@@ -1,50 +1,76 @@
 <!-- src/components/user/BookingProofModal.vue -->
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useAuthStore } from '@/store/auth'
-import { fetchMyLatestBooking, cancelBooking } from '@/services/api'
+// เปลี่ยนมาใช้ fetchMyBooking (ของวันนี้) แทน fetchMyLatestBooking
+import { fetchMyBooking, cancelBooking } from '@/services/api'
 
 const props = defineProps({
-  open: { type: Boolean, default: false }
+  open: { type: Boolean, default: false },
+  // ถ้าไม่ส่งมา จะใช้วันที่วันนี้อัตโนมัติ (YYYY-MM-DD)
+  date: { type: String, default: '' },
+  // ถ้าต้องการให้กรองเฉพาะห้องที่กำลังดูอยู่ ให้ส่ง roomCode; ไม่ส่งคือไม่กรอง
+  roomCode: { type: String, default: '' },
 })
 const emit = defineEmits(['update:open', 'close'])
 
-const loading = ref(false)
-const notFound = ref(false)   // ยังไม่เคยจอง
-const booking = ref(null)     // มีการจองล่าสุด
 const auth = useAuthStore()
+
+const loading = ref(false)
+const notFound = ref(false)   // วันนี้ยังไม่มีการจองของ user
+const booking = ref(null)     // รายการจองของ user (ควรมีได้อย่างมาก 1 จากกฎ 1 วัน/1 ครั้ง)
+
+// ใช้วันที่วันนี้ถ้าไม่ส่งมา
+const dateStr = computed(() =>
+  props.date && /^\d{4}-\d{2}-\d{2}$/.test(props.date)
+    ? props.date
+    : new Date().toISOString().slice(0, 10)
+)
 
 const close = () => {
   emit('update:open', false)
   emit('close')
 }
 
-watch(() => props.open, async (val) => {
-  if (!val) return
+const load = async () => {
+  if (!auth.isLoggedIn) {
+    notFound.value = true
+    booking.value = null
+    return
+  }
   loading.value = true
   notFound.value = false
   booking.value = null
   try {
-    const { data } = await fetchMyLatestBooking()
-    if (!data || !data.id) {
+    const { data } = await fetchMyBooking({
+      date: dateStr.value,
+      ...(props.roomCode ? { roomCode: props.roomCode } : {})
+    })
+    // รองรับได้ทั้งรูปแบบ { ok, data } หรือคืน object ตรง ๆ
+    const rec = data?.data ?? data ?? null
+    if (!rec || !rec.id) {
       notFound.value = true
     } else {
-      booking.value = data           // { id, room_code, start_at, end_at, members: [] }
+      booking.value = rec   // { id, room_code, start_hhmm, end_hhmm, start_at?, end_at?, members? }
     }
   } catch (e) {
-    // ถ้า error (เช่น 404) ให้ถือว่าไม่พบการจอง
     notFound.value = true
   } finally {
     loading.value = false
   }
-})
+}
+
+// โหลดเมื่อเปิดโมดัล หรือเมื่อวันที่/ห้องเปลี่ยนตอนที่โมดัลเปิดอยู่
+watch(
+  () => [props.open, dateStr.value, props.roomCode],
+  ([isOpen]) => { if (isOpen) load() }
+)
 
 async function onCancelBooking() {
   if (!booking.value) return
   if (!confirm('ยืนยันยกเลิกการจอง?')) return
   try {
     await cancelBooking(booking.value.id)
-    // หลังยกเลิกสำเร็จ ให้แสดง modal แบบ "ยังไม่ได้จอง"
     booking.value = null
     notFound.value = true
     alert('ยกเลิกการจองสำเร็จ')
@@ -59,25 +85,31 @@ async function onCancelBooking() {
     <div class="modal-card">
       <div v-if="loading" class="center">กำลังโหลด...</div>
 
-      <!-- แบบที่ 1: ยังไม่เคยจอง -->
+      <!-- แบบที่ 1: วันนี้ยังไม่มีการจอง -->
       <div v-else-if="notFound" class="content">
         <div class="icon x">✕</div>
         <h2 class="title">หลักฐานการจองห้องสมุด</h2>
-        <p class="subtitle">ยังไม่ได้จอง</p>
-
+        <p class="subtitle">วันนี้คุณยังไม่มีการจอง</p>
         <div class="actions">
           <button class="btn confirm" @click="close">ยืนยัน</button>
         </div>
       </div>
 
-      <!-- แบบที่ 2: เคยจองแล้ว -->
+      <!-- แบบที่ 2: มีการจองของวันนั้น -->
       <div v-else class="content">
         <div class="icon check">✓</div>
         <h2 class="title">หลักฐานการจองห้องสมุด</h2>
-        <p class="subtitle">การจองเสร็จสิ้น</p>
+        <p class="subtitle">การจองเสร็จสิ้น ({{ dateStr }})</p>
 
         <div class="block">
           <strong>ห้องที่ทำการจอง :</strong> {{ booking.room_code }}
+        </div>
+
+        <div class="block">
+          <strong>เวลา :</strong>
+          {{ booking.start_hhmm || (booking.start_at ? new Date(booking.start_at).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'}) : '') }}
+          -
+          {{ booking.end_hhmm || (booking.end_at ? new Date(booking.end_at).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'}) : '') }}
         </div>
 
         <div class="block">
