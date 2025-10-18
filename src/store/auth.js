@@ -16,18 +16,18 @@ export const useAuthStore = defineStore('auth', {
   }),
 
   getters: {
-    isLoggedIn: (s) => !!s.user,
+    isLoggedIn: (s) => !!s.user && !!s.token,
     displayName: (s) => s.user?.display_name || '',
     studentId:  (s) => s.user?.student_id || '',
-    roleUpper:  (s) => (s.user?.role || 'USER').toUpperCase(),
-    isAdmin:    (s) => (s.user?.role || '').toUpperCase() === 'ADMIN',
+    roleUpper:  (s) => String(s.user?.role || 'USER').toUpperCase(),
+    isAdmin:    (s) => String(s.user?.role || '').toUpperCase() === 'ADMIN',
   },
 
   actions: {
-    /** ใช้ตอน login สำเร็จ */
     setSession({ user, token }) {
-      // ป้องกันกรณี user ไม่มี role
       const safeUser = { role: 'USER', ...user }
+      safeUser.role = String(safeUser.role || 'USER').toUpperCase()
+
       this.user  = safeUser
       this.token = token || null
 
@@ -36,20 +36,21 @@ export const useAuthStore = defineStore('auth', {
       else localStorage.removeItem('token')
     },
 
-    /** อัปเดตข้อมูล user บางส่วน โดยไม่กระทบ token */
     updateUser(patch = {}) {
       if (!this.user) return
-      this.user = { ...this.user, ...patch }
+      const next = { ...this.user, ...patch }
+      if (next.role) next.role = String(next.role).toUpperCase()
+      this.user = next
       localStorage.setItem('user', JSON.stringify(this.user))
     },
 
-    /** ใช้ฟื้น state หลัง refresh (ถ้าจำเป็น) */
     loadFromStorage() {
       this.user  = readJSON('user', null)
       this.token = localStorage.getItem('token') || null
     },
 
-    /** logout */
+    hydrate() { this.loadFromStorage() },
+
     clear() {
       this.user  = null
       this.token = null

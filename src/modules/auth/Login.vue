@@ -31,11 +31,11 @@ function doLogin() {
     return
   }
 
-  // ไปหน้าเริ่มต้นตามบทบาท
+  // ไปหน้าเริ่มต้นตามบทบาท (มี fallback กันชื่อ route ไม่ตรง)
   if (user.role === 'ADMIN') {
-    router.replace({ name: 'admin.rooms' })
+    router.replace({ name: 'admin.rooms' }).catch(() => router.replace('/admin'))
   } else {
-    router.replace({ name: 'user.rooms' }) // ใช้ชื่อ route ใหม่ให้ชัดเจน
+    router.replace({ name: 'user.rooms' }).catch(() => router.replace('/user/rooms'))
   }
 }
 </script>

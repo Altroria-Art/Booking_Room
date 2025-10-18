@@ -1,37 +1,83 @@
 // src/services/api.js
-import api from '@/plugins/axios'   // ถ้าไม่ได้ตั้ง alias '@' ให้เปลี่ยนเป็น '../plugins/axios'
+// NOTE: ถ้าโปรเจกต์ไม่ได้ตั้ง alias '@' ให้เปลี่ยนเป็น '../plugins/axios'
+import api from '@/plugins/axios'
 
 /* ========= helpers กันแคช ========= */
-const stamp = (params = {}) => ({ ...params, _: Date.now() }) // แนบ time-stamp ทุกครั้ง
+const stamp  = (params = {}) => ({ ...params, _: Date.now() }) // แนบ time-stamp ทุกครั้ง
 const noStore = { headers: { 'Cache-Control': 'no-store', 'Pragma': 'no-cache' } }
 
-/* ---------- Bookings (ของผู้ใช้) ---------- */
+/* ===================================
+ * ROOM TYPES
+ * ===================================*/
+export const fetchRoomTypes     = (params = {}) => api.get('/room-types', { params })
+export const createRoomType     = (payload)      => api.post('/room-types', payload)
+export const updateRoomType     = (id, payload)  => api.put(`/room-types/${id}`, payload)
+export const deleteRoomType     = (id)           => api.delete(`/room-types/${id}`)
+
+/* ===================================
+ * ROOMS
+ * ===================================*/
+export const fetchRooms         = (params = {}) => api.get('/rooms', { params })
+export const createRoom         = (payload)      => api.post('/rooms', payload)
+export const updateRoom         = (id, payload)  => api.put(`/rooms/${id}`, payload)
+export const deleteRoom         = (id)           => api.delete(`/rooms/${id}`)
+// (เผื่อมี endpoint เปิด/ปิดห้องแบบเร็ว)
+export const toggleRoomActive   = (id, active)   => api.patch(`/rooms/${id}/active`, { active })
+
+/* ===================================
+ * BOOKINGS (ผู้ใช้ทั่วไป)
+ * ===================================*/
 // ใช้ใน "หลักฐานการจอง" → ต้องกันแคชเสมอ
-export const fetchMyBooking = (params = {}) =>
+export const fetchMyBooking       = (params = {}) =>
   api.get('/bookings/my', { params: stamp(params), ...noStore })   // { date, roomCode? }
 
-export const fetchMyBookingToday = (date) =>
+export const fetchMyBookingToday  = (date) =>
   api.get('/bookings/my', { params: stamp({ date }), ...noStore })
 
 // ใช้ดึงรายการล่าสุด (กันแคชไว้ด้วยกันพลาด)
 export const fetchMyLatestBooking = () =>
   api.get('/bookings/my-latest', { params: stamp(), ...noStore })
 
-export const cancelBooking = (bookingId) =>
+export const cancelBooking        = (bookingId) =>
   api.delete(`/bookings/${bookingId}`)
 
-/* ---------- Reviews (ผู้ใช้) ---------- */
-// ผู้ใช้ดึงรีวิวตามห้อง/แบ่งหน้า
-export const fetchReviews = (params = {}) =>
-  api.get('/reviews', { params })       // { page, pageSize, room_id }
+// generic booking (เผื่อหน้าอื่นใช้)
+export const fetchBookings        = (params = {}) => api.get('/bookings', { params })
+export const createBooking        = (payload)      => api.post('/bookings', payload)
 
-// ผู้ใช้สร้างรีวิว
-export const createReview = (payload) =>
-  api.post('/reviews', payload)         // { rating, comment, created_by, room_id? }
+/* ===================================
+ * REVIEWS (ผู้ใช้)
+ * ===================================*/
+export const fetchReviews         = (params = {}) => api.get('/reviews', { params }) // { page, pageSize, room_id }
+export const createReview         = (payload)      => api.post('/reviews', payload)   // { rating, comment, created_by, room_id? }
 
-/* ---------- Admin: Reviews ---------- */
-export const getAdminReviews = (params = {}) =>
-  api.get('/reviews/admin', { params }) // { page, pageSize, room_id?, rating? }
+/* ===================================
+ * ADMIN: Reviews / Bookings (ถ้ามี)
+ * ===================================*/
+export const getAdminReviews        = (params = {}) => api.get('/reviews/admin', { params })      // { page, pageSize, room_id?, rating? }
+export const getAdminReviewSummary  = (params = {}) => api.get('/reviews/admin/summary', { params })
+export const getAdminBookings       = (params = {}) => api.get('/bookings/admin', { params })
 
-export const getAdminReviewSummary = (params = {}) =>
-  api.get('/reviews/admin/summary', { params }) //
+/* ===================================
+ * default export (เผื่อบางไฟล์ import แบบ default)
+ * ===================================*/
+export default {
+  // helpers
+  stamp, noStore,
+
+  // room types
+  fetchRoomTypes, createRoomType, updateRoomType, deleteRoomType,
+
+  // rooms
+  fetchRooms, createRoom, updateRoom, deleteRoom, toggleRoomActive,
+
+  // bookings
+  fetchMyBooking, fetchMyBookingToday, fetchMyLatestBooking, cancelBooking,
+  fetchBookings, createBooking,
+
+  // reviews
+  fetchReviews, createReview,
+
+  // admin
+  getAdminReviews, getAdminReviewSummary, getAdminBookings,
+}

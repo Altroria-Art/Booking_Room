@@ -1,27 +1,11 @@
-<script setup>
-import MainNavbar from './components/user/MainNavbar.vue'
-import HeroSection from './components/user/HeroSection.vue'
-import BookingModal from './components/user/BookingModal.vue'
-import { ref, computed } from 'vue'
-import { useRoute } from 'vue-router'
-import ReviewRoom from './components/user/ReviewRoom.vue';
-
-const showBooking = ref(false)
-
-const route = useRoute()
-const showHero = computed(() => ['/', '/review', '/history'].includes(route.path))
-</script>
-
 <template>
   <router-view />
-  <!-- <div>
-    <MainNavbar />
-    <HeroSection v-if="showHero" />
-    <router-view />
-    <div>
-      <button @click="showBooking = true">ยืนยันการจอง ➕</button>
-      <BookingModal v-model:open="showBooking" />
-    </div>
-    <ReviewRoom />
-  </div> -->
 </template>
+
+<script setup>
+// ว่าง ๆ ได้ ไม่ต้องมีอะไร
+</script>
+
+<style>
+/* optional */
+</style>
