@@ -1,6 +1,9 @@
 // src/services/api.js
 import api from '@/plugins/axios'   // ถ้าไม่ได้ตั้ง alias '@' ให้เปลี่ยนเป็น '../plugins/axios'
 
+export const fetchMyBookingToday = (date) =>
+  api.get('/bookings/my', { params: { date } })
+
 export const fetchMyLatestBooking = () =>
   api.get('/bookings/my-latest')   // ใช้ token จาก axios interceptor
 
