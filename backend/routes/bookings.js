@@ -80,20 +80,28 @@ router.get('/my', requireAuth, async (req, res) => {
 
     const date = req.query.date || new Date().toISOString().slice(0, 10)
     const roomCode = req.query.roomCode || null
-    const studentId = sanitizeId(req.user?.student_id)
-    if (!studentId) return res.status(401).json({ error: 'Unauthenticated' })
 
+    // ใช้ helper เดิมของไฟล์คุณ
+    const studentId = sanitizeId(req.user?.student_id)
+    if (!studentId) {
+      return res.status(401).json({ ok: false, message: 'Unauthenticated' })
+    }
+
+    // NOTE: รักษา "shape การตอบกลับ" เดิมของคุณ => { ok, date, data }
     const params = [studentId, date]
     const roomFilter = roomCode ? ' AND r.room_code = ? ' : ''
     if (roomCode) params.push(roomCode)
 
     const [rows] = await pool.query(
-      `SELECT b.id, r.room_code,
-              TIME_FORMAT(b.start_at,'%H:%i') AS start_hhmm,
-              TIME_FORMAT(b.end_at,'%H:%i')   AS end_hhmm,
-              b.start_at, b.end_at, b.created_by
+      `SELECT
+         b.id, b.room_id, r.room_code,
+         TIME_FORMAT(b.start_at, '%H:%i') AS start_hhmm,
+         TIME_FORMAT(b.end_at,   '%H:%i') AS end_hhmm,
+         b.start_at, b.end_at, b.created_by,
+         COALESCE(u.display_name, '') AS display_name
        FROM bookings b
        JOIN rooms r ON r.id = b.room_id
+       LEFT JOIN users u ON u.student_id = b.created_by
        WHERE b.created_by = ?
          AND DATE(b.start_at) = ? ${roomFilter}
        ORDER BY b.start_at
@@ -101,14 +109,28 @@ router.get('/my', requireAuth, async (req, res) => {
       params
     )
 
-    return res.json({
-      ok: true,
-      date,
-      data: rows[0] || null
-    })
+    if (rows.length === 0) {
+      return res.json({ ok: true, date, data: null })
+    }
+
+    const booking = rows[0]
+
+    // ดึง "ผู้ร่วมจอง" ทั้งหมดของรายการนี้ (ไม่รวมเจ้าของ)
+    const [mems] = await pool.query(
+      `SELECT student_id
+         FROM booking_members
+        WHERE booking_id = ?
+        ORDER BY id ASC`,
+      [booking.id]
+    )
+    booking.members = mems
+      .map(m => m.student_id)
+      .filter(sid => sid !== booking.created_by)
+
+    return res.json({ ok: true, date, data: booking })
   } catch (e) {
     console.error(e)
-    res.status(500).json({ ok: false, message: 'failed to load my booking' })
+    return res.status(500).json({ ok: false, message: 'failed to load my booking' })
   }
 })
 
