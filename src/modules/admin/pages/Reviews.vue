@@ -1,6 +1,5 @@
-<!-- src/modules/admin/pages/Reviews.vue -->
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { getAdminReviews, deleteAdminReview, getAdminReviewSummary } from '@/services/api'
 
 // state
@@ -9,9 +8,21 @@ const loading = ref(false)
 const page    = ref(1)
 const last    = ref(1)
 const total   = ref(0)
-const roomId  = ref(null)         // ถ้าต้องการกรองตามห้อง ให้เซ็ตค่ามาได้
-const rating  = ref(0)            // 0 = ทั้งหมด, 1..5 = กรองตามดาว
+const roomId  = ref(null)
+const rating  = ref(0) // 0=ทั้งหมด, 1..5=กรอง
 const counts  = ref({ 1:0,2:0,3:0,4:0,5:0 })
+
+// เมนูสามจุดของรีวิวที่เปิดอยู่
+const openMenuId = ref(null)
+function toggleMenu(id) {
+  openMenuId.value = openMenuId.value === id ? null : id
+}
+function closeMenu() { openMenuId.value = null }
+
+// ปิดเมนูเมื่อคลิกข้างนอก
+function onDocClick() { closeMenu() }
+onMounted(() => document.addEventListener('click', onDocClick))
+onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
 
 async function loadSummary() {
   const { data } = await getAdminReviewSummary({ room_id: roomId.value || undefined })
@@ -21,16 +32,19 @@ async function loadSummary() {
 
 async function load(pageNo = 1) {
   loading.value = true
-  const { data } = await getAdminReviews({
-    page: pageNo,
-    pageSize: 10,
-    room_id: roomId.value || undefined,
-    rating: rating.value || undefined,
-  })
-  items.value = data.data
-  page.value  = data.current_page
-  last.value  = data.last_page
-  loading.value = false
+  try {
+    const { data } = await getAdminReviews({
+      page: pageNo,
+      pageSize: 10,
+      room_id: roomId.value || undefined,
+      rating: rating.value || undefined,
+    })
+    items.value = data.data
+    page.value  = data.current_page
+    last.value  = data.last_page
+  } finally {
+    loading.value = false
+  }
 }
 
 function setFilterStar(v) {
@@ -38,17 +52,11 @@ function setFilterStar(v) {
   load(1)
 }
 
-async function removeRow(id) {
-  if (!confirm('ยืนยันการลบรีวิวนี้?')) return
+// ลบรีวิวแบบกดจากเมนู (ไม่มี alert confirm แบบเดิม)
+async function removeRowDirect(id) {
+  closeMenu()
   await deleteAdminReview(id)
   await Promise.all([loadSummary(), load(page.value)])
-}
-
-// simple helper for stars
-function stars(n) {
-  const filled = '●'.repeat(n)
-  const empty  = '○'.repeat(5 - n)
-  return filled + empty
 }
 
 onMounted(async () => {
@@ -56,13 +64,12 @@ onMounted(async () => {
   await load(1)
 })
 
-// pagination helper
 const pages = computed(() => {
   const arr = []
   const sz = 5
   const start = Math.max(1, page.value - 2)
   const end   = Math.min(last.value, start + sz - 1)
-  for (let i = start; i <= end; i++) arr.push(i)
+  for (let i=start; i<=end; i++) arr.push(i)
   return arr
 })
 const lastShown = computed(() => pages.value.length ? pages.value[pages.value.length - 1] : 0)
@@ -70,18 +77,12 @@ const lastShown = computed(() => pages.value.length ? pages.value[pages.value.le
 
 <template>
   <div>
-    <!-- ✅ เอา HeroSectionAdmin ออก: Layout จะเป็นคนแสดงให้เอง -->
-
     <section class="wrap">
       <h2 class="section-title">รีวิว Review</h2>
 
       <!-- chips -->
       <div class="chips-row">
-        <button
-          class="chip"
-          :class="{ active: rating===0 }"
-          @click="setFilterStar(0)"
-        >
+        <button class="chip" :class="{ active: rating===0 }" @click="setFilterStar(0)">
           ความคิดเห็นทั้งหมด <span class="count">({{ total }})</span>
         </button>
 
@@ -90,9 +91,6 @@ const lastShown = computed(() => pages.value.length ? pages.value[pages.value.le
         <button class="chip" :class="{active: rating===3}" @click="setFilterStar(3)">3 ดาว <span class="count">({{ counts[3] }})</span></button>
         <button class="chip" :class="{active: rating===2}" @click="setFilterStar(2)">2 ดาว <span class="count">({{ counts[2] }})</span></button>
         <button class="chip" :class="{active: rating===1}" @click="setFilterStar(1)">1 ดาว <span class="count">({{ counts[1] }})</span></button>
-
-        <div class="spacer"></div>
-        <button class="chip primary" disabled>แสดงความคิดเห็นนี้</button>
       </div>
 
       <!-- list -->
@@ -103,10 +101,31 @@ const lastShown = computed(() => pages.value.length ? pages.value[pages.value.le
           <div class="content">
             <div class="row-1">
               <div class="name">{{ r.user_name || r.created_by }}</div>
-              <div class="stars" :title="r.rating + ' ดาว'">{{ stars(r.rating) }}</div>
+
+              <!-- ดาว -->
+              <div
+                class="stars"
+                :title="`${r.rating} ดาว`"
+                role="img"
+                :aria-label="`คะแนน ${r.rating} จาก 5`"
+              >
+                <span v-for="i in 5" :key="i" class="star" :class="{ on: i <= r.rating }">★</span>
+              </div>
+
               <div class="date">{{ new Date(r.created_at).toLocaleString() }}</div>
-              <button class="del" @click="removeRow(r.id)" title="ลบรีวิว">🗑️</button>
+
+              <!-- เมนู 3 จุด -->
+              <div class="actions">
+                <button class="dots" @click.stop="toggleMenu(r.id)" aria-label="เมนูเพิ่มเติม">
+                  <span></span><span></span><span></span>
+                </button>
+
+                <div v-if="openMenuId === r.id" class="menu" @click.stop>
+                  <button class="pill" @click="removeRowDirect(r.id)">ลบรีวิว</button>
+                </div>
+              </div>
             </div>
+
             <div class="comment">{{ r.comment }}</div>
           </div>
         </div>
@@ -143,7 +162,6 @@ const lastShown = computed(() => pages.value.length ? pages.value[pages.value.le
   display:flex; align-items:center; gap:10px;
   background:#fff6e9; padding:12px; border-radius:8px; margin-bottom:18px;
 }
-.spacer{ flex:1; }
 .chip{
   border:1px solid #e6e6e6; background:#fff; color:#222;
   padding:8px 12px; border-radius:8px; font-weight:600; font-size:14px;
@@ -151,7 +169,6 @@ const lastShown = computed(() => pages.value.length ? pages.value[pages.value.le
 }
 .chip .count{ color:#7b7b7b; font-weight:500; }
 .chip.active{ background:#eef2ff; border-color:#c7d2fe; color:#1f2a5a; }
-.chip.primary{ background:#e9efff; border-color:#c7d2fe; color:#1d4ed8; }
 
 .review-list{ display:flex; flex-direction:column; gap:18px; }
 .review-item{
@@ -164,10 +181,41 @@ const lastShown = computed(() => pages.value.length ? pages.value[pages.value.le
   display:grid; grid-template-columns: 1fr auto auto auto; gap:10px; align-items:center;
 }
 .name{ font-weight:700; }
-.stars{ color:#ffaa00; font-size:14px; letter-spacing:2px; }
+
+/* ดาว */
+.stars{
+  display:inline-flex;
+  gap:2px;
+  font-size:14px;
+  line-height:1;
+}
+.star{ color:#d1d5db; }
+.star.on{ color:#f59e0b; }
+
 .date{ color:#999; font-size:12px; }
-.del{ background:transparent; border:none; cursor:pointer; font-size:16px; opacity:.85; }
-.del:hover{ opacity:1; }
+
+/* เมนู 3 จุด + ป๊อปอัป "ลบรีวิว" */
+.actions{ position:relative; }
+.dots{
+  background:transparent; border:none; padding:6px;
+  display:flex; flex-direction:column; align-items:center; gap:3px;
+  cursor:pointer;
+}
+.dots span{
+  width:4px; height:4px; background:#111827; border-radius:50%;
+  display:block;
+}
+.menu{
+  position:absolute; right:0; top:28px; z-index:20;
+  white-space: nowrap;
+}
+.pill{
+  background:#e9edff; border:1px solid #c7d2fe; color:#1d4ed8;
+  border-radius:16px; padding:6px 12px; font-weight:700;
+  box-shadow:0 4px 14px rgba(0,0,0,.08);
+  cursor:pointer;
+}
+.pill:hover{ filter: brightness(0.96); }
 
 .comment{ margin-top:6px; line-height:1.6; white-space:pre-wrap; }
 
