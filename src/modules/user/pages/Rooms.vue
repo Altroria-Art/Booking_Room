@@ -9,6 +9,12 @@ const { adminMode } = withDefaults(defineProps<{ adminMode?: boolean }>(), {
   adminMode: false
 })
 
+/* ✅ อีเวนต์สำหรับหน้าแอดมิน */
+const emit = defineEmits<{
+  (e: 'admin-add'): void
+  (e: 'admin-edit'): void
+}>()
+
 const showBooking = ref(false)
 
 /* ===== เวลา =====
@@ -180,13 +186,28 @@ async function handleBooked() {
       <div class="today">
         {{ new Intl.DateTimeFormat('en-GB',{day:'2-digit',month:'long',year:'numeric'}).format(new Date()) }}
       </div>
-      <button type="button" class="btn-book" @click="showBooking = true">
-        <span>จองห้องประชุมที่นี่</span>
-        <svg class="btn-icon" viewBox="0 0 48 48" aria-hidden="true">
-          <circle cx="24" cy="24" r="20" fill="#FFFFFF"/>
-          <path d="M24 16v16M16 24h16" stroke="#1F49FF" stroke-width="4" stroke-linecap="round"/>
-        </svg>
-      </button>
+
+      <!-- กลุ่มปุ่มด้านขวา: ปุ่มแอดมิน + ปุ่มจอง อยู่แถบเดียวกัน -->
+      <div class="date-actions">
+        <!-- ปุ่มของแอดมิน: แสดงเฉพาะตอนฝังในหน้าแอดมิน -->
+        <template v-if="adminMode">
+          <button type="button" class="btn-admin add"  @click="emit('admin-add')">
+            เพิ่มห้อง <span class="pill">+</span>
+          </button>
+          <button type="button" class="btn-admin edit" @click="emit('admin-edit')">
+            แก้ไขห้อง <span class="pill">+</span>
+          </button>
+        </template>
+
+        <!-- ปุ่มจอง (ผู้ใช้ทั่วไป) -->
+        <button type="button" class="btn-book" @click="showBooking = true">
+          <span>จองห้องประชุมที่นี่</span>
+          <svg class="btn-icon" viewBox="0 0 48 48" aria-hidden="true">
+            <circle cx="24" cy="24" r="20" fill="#FFFFFF"/>
+            <path d="M24 16v16M16 24h16" stroke="#1F49FF" stroke-width="4" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
     </div>
 
     <!-- ตาราง -->
@@ -252,8 +273,62 @@ async function handleBooked() {
 
 .date-row{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 0 14px; border-bottom:1px solid #e5e7eb; }
 .today{ font-size:1.25rem; font-weight:700; color:#111827; }
-.btn-book{ display:inline-flex; align-items:center; gap:10px; background:#1F49FF; color:#fff; padding:8px 14px; border:0; border-radius:10px; font:600 14px/1.2 system-ui,-apple-system,Segoe UI,Roboto,'Noto Sans Thai',sans-serif; box-shadow:0 4px 12px rgba(0,0,0,.12); cursor:pointer; transition:filter .15s ease, transform .05s ease; }
-.btn-book:hover{ filter:brightness(1.08); } .btn-book:active{ transform:translateY(1px); }
+
+/* กลุ่มปุ่มด้านขวา */
+.date-actions{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+
+/* ปุ่มของแอดมินให้หน้าตาเข้ากับแถบนี้ */
+.btn-admin{
+  display:inline-flex;
+  align-items:center;
+  gap:.5rem;
+  font:700 14px/1.2 system-ui,-apple-system,Segoe UI,Roboto,'Noto Sans Thai',sans-serif;
+  border:0;
+  color:#111;
+  padding:8px 12px;
+  border-radius:10px;
+  box-shadow:0 4px 12px rgba(0,0,0,.12);
+  cursor:pointer;
+  transition:filter .15s ease, transform .05s ease;
+}
+.btn-admin:hover{ filter:brightness(0.98); }
+.btn-admin:active{ transform:translateY(1px); }
+
+/* โทนสีตามเดิมของคุณ */
+.btn-admin.add{  background:#7dfc90; }
+.btn-admin.edit{ background:#ffe169; }
+
+/* จุดกลมเครื่องหมาย + */
+.btn-admin .pill{
+  display:inline-grid;
+  place-items:center;
+  width:18px; height:18px;
+  border-radius:50%;
+  background:#111; color:#fff;
+  font-weight:900; line-height:1;
+}
+
+/* ปุ่มจอง */
+.btn-book{
+  display:inline-flex;
+  align-items:center;
+  gap:10px;
+  background:#1F49FF;
+  color:#fff;
+  padding:8px 14px;
+  border:0;
+  border-radius:10px;
+  font:600 14px/1.2 system-ui,-apple-system,Segoe UI,Roboto,'Noto Sans Thai',sans-serif;
+  box-shadow:0 4px 12px rgba(0,0,0,.12);
+  cursor:pointer;
+  transition:filter .15s ease, transform .05s ease;
+}
+.btn-book:hover{ filter:brightness(1.08); }
+.btn-book:active{ transform:translateY(1px); }
 .btn-book:focus-visible{ outline:none; box-shadow:0 0 0 3px #fff, 0 0 0 6px rgba(31,73,255,.6); }
 .btn-icon{ width:22px; height:22px; flex:0 0 auto; }
 
