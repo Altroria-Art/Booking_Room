@@ -31,7 +31,6 @@ const loadRooms = () => {
     </div>
 
     <!-- ✅ ใช้ตารางจองห้องของฝั่งผู้ใช้มาแสดงในหน้าแอดมิน -->
-    <!--    ถ้าใน Rooms.vue มีปุ่ม/ส่วนหัวที่ไม่อยากโชว์ในแอดมิน ให้ดูหัวข้อข้อ 2 ด้านล่าง -->
     <div class="admin-embed">
       <UserRooms :admin-mode="true" />
     </div>
@@ -81,14 +80,12 @@ const loadRooms = () => {
   font-weight: 900; line-height: 1;
 }
 
-/* (ทางเลือก) ถ้าหน้า User มี Header/Toolbar ที่ไม่อยากโชว์ใน Admin
-   ใส่ deep selector ปิดได้ เช่น: */
+/* (ตัวเลือก) ถ้าหน้า User มี header/toolbar อื่นที่อยากซ่อนในหน้าแอดมิน */
 :deep(.user-rooms__topbar),
 :deep(.user-rooms__nav),
 :deep(.user-rooms__toolbar) {
   display: none !important;
 }
 
-/* เพิ่มช่องว่างเพื่อไม่ให้ตารางชิดขอบล่าง */
 .admin-embed { padding-bottom: 64px; }
 </style>
