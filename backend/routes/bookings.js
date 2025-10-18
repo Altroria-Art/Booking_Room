@@ -10,7 +10,7 @@ const router = express.Router()
 // =============================
 router.get('/', async (req, res) => {
   try {
-    const date = req.query.date || new Date().toISOString().slice(0, 10)
+    const date = req.query.date || new Date().toLocaleDateString('sv-SE')
     const roomCode = req.query.roomCode || null
 
     // กัน cache
