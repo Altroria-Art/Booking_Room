@@ -71,37 +71,44 @@ async function findConflictsByRoomCode(roomCode, startAt, endAt) {
 }
 
 /* ----------------------------------------------
-   ฟีเจอร์ "เช็คของฉันวันนี้" (ใช้บนหน้า user เพื่อปิดปุ่มจอง)
+   ฟีเจอร์ "เช็คของฉันวันนี้" (ใช้บนหน้า user / หลักฐานการจอง)
    ---------------------------------------------- */
-// GET /api/bookings/my?date=YYYY-MM-DD
+// GET /api/bookings/my?date=YYYY-MM-DD[&roomCode=CE08202]
 router.get('/my', requireAuth, async (req, res) => {
   try {
     res.set('Cache-Control', 'no-store')
 
     const date = req.query.date || new Date().toISOString().slice(0, 10)
+    const roomCode = req.query.roomCode || null
     const studentId = sanitizeId(req.user?.student_id)
     if (!studentId) return res.status(401).json({ error: 'Unauthenticated' })
+
+    const params = [studentId, date]
+    const roomFilter = roomCode ? ' AND r.room_code = ? ' : ''
+    if (roomCode) params.push(roomCode)
 
     const [rows] = await pool.query(
       `SELECT b.id, r.room_code,
               TIME_FORMAT(b.start_at,'%H:%i') AS start_hhmm,
-              TIME_FORMAT(b.end_at,'%H:%i')   AS end_hhmm
+              TIME_FORMAT(b.end_at,'%H:%i')   AS end_hhmm,
+              b.start_at, b.end_at, b.created_by
        FROM bookings b
        JOIN rooms r ON r.id = b.room_id
-       WHERE b.created_by = ? AND DATE(b.start_at) = ?
+       WHERE b.created_by = ?
+         AND DATE(b.start_at) = ? ${roomFilter}
        ORDER BY b.start_at
        LIMIT 1`,
-      [studentId, date]
+      params
     )
 
-    res.json({
+    return res.json({
+      ok: true,
       date,
-      hasBooking: rows.length > 0,
-      booking: rows[0] || null
+      data: rows[0] || null
     })
   } catch (e) {
     console.error(e)
-    res.status(500).json({ message: 'Server error', detail: e.message })
+    res.status(500).json({ ok: false, message: 'failed to load my booking' })
   }
 })
 
@@ -170,26 +177,45 @@ router.post('/', requireAuth, async (req, res) => {
     return res.status(201).json({ ok: true })
   } catch (e) {
     const msg = e?.sqlMessage || e?.message || 'server error'
-    // ถ้าข้อความจาก SP แจ้งเรื่อง overlap/duplicate ให้ถือเป็น 409
     const status = /overlap|duplicate|ซ้ำ|ครั้งต่อวัน/i.test(msg) ? 409 : 400
     return res.status(status).json({ ok: false, message: msg })
   }
 })
 
 /* ----------------------------------------------
-   เพิ่มสำหรับฟีเจอร์ "หลักฐานการจอง"
+   ฟีเจอร์ "หลักฐานการจอง" (คง endpoint เดิมเพื่อความเข้ากันได้)
    ---------------------------------------------- */
-
-// 4.1 ดูการจองล่าสุดของ user ที่กำลังล็อกอิน
-// GET /api/bookings/my-latest
+// GET /api/bookings/my-latest[?date=YYYY-MM-DD]
 router.get('/my-latest', requireAuth, async (req, res) => {
   try {
     res.set('Cache-Control', 'no-store')
-
     const studentId = req.user?.student_id
     if (!studentId) return res.status(401).json({ error: 'Unauthenticated' })
 
-    // เลือก "รายการล่าสุด" โดยเรียงจาก start_at ล่าสุด
+    const date = req.query.date
+
+    if (date) {
+      // ถ้าส่ง date มา → ทำงานแบบ "ของฉันวันนี้"
+      const [rows] = await pool.query(
+        `SELECT b.id, b.room_id, r.room_code, b.start_at, b.end_at, b.created_by
+         FROM bookings b
+         JOIN rooms r ON r.id = b.room_id
+         WHERE b.created_by = ? AND DATE(b.start_at) = ?
+         ORDER BY b.start_at
+         LIMIT 1`,
+        [studentId, date]
+      )
+      if (rows.length === 0) return res.json(null)
+      const booking = rows[0]
+      const [mems] = await pool.query(
+        'SELECT student_id FROM booking_members WHERE booking_id = ? ORDER BY id ASC',
+        [booking.id]
+      )
+      const members = mems.map(m => m.student_id).filter(sid => sid !== booking.created_by)
+      return res.json({ ...booking, members })
+    }
+
+    // ไม่ส่ง date → คืนรายการล่าสุด (เพื่อเข้ากันได้กับโค้ดเดิม)
     const [rows] = await pool.query(
       `SELECT b.id, b.room_id, r.room_code, b.start_at, b.end_at, b.created_by
        FROM bookings b
@@ -199,51 +225,32 @@ router.get('/my-latest', requireAuth, async (req, res) => {
        LIMIT 1`,
       [studentId]
     )
-
-    if (rows.length === 0) {
-      return res.json(null) // ฝั่งหน้าเว็บจะตีความว่า "ยังไม่ได้จอง"
-    }
+    if (rows.length === 0) return res.json(null)
 
     const booking = rows[0]
     const [mems] = await pool.query(
       'SELECT student_id FROM booking_members WHERE booking_id = ? ORDER BY id ASC',
       [booking.id]
     )
-
-    // ถ้า stored procedure ใส่ owner เข้า booking_members ด้วย ให้ตัด owner ออก
     const members = mems.map(m => m.student_id).filter(sid => sid !== booking.created_by)
-
-    return res.json({
-      id: booking.id,
-      room_code: booking.room_code,
-      start_at: booking.start_at,
-      end_at: booking.end_at,
-      members
-    })
+    return res.json({ ...booking, members })
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Internal error' })
   }
 })
 
-// 4.2 ยกเลิกการจอง (ลบ)
-// DELETE /api/bookings/:id
-// แนะนำให้ schema ตั้ง FK booking_members.booking_id → bookings.id เป็น ON DELETE CASCADE
+// DELETE /api/bookings/:id (ยกเลิกของตัวเอง)
 router.delete('/:id', requireAuth, async (req, res) => {
   try {
     const bookingId = Number(req.params.id)
     const studentId = req.user?.student_id
     if (!studentId) return res.status(401).json({ error: 'Unauthenticated' })
 
-    // ลบเฉพาะรายการที่ตัวเองเป็นผู้จอง
     const [r] = await pool.query(
       'DELETE FROM bookings WHERE id = ? AND created_by = ?',
       [bookingId, studentId]
     )
-
-    // ถ้า schema ของคุณยังไม่ได้ cascade:
-    // await pool.query('DELETE FROM booking_members WHERE booking_id = ?', [bookingId])
-    // const [r] = await pool.query('DELETE FROM bookings WHERE id = ? AND created_by = ?', [bookingId, studentId])
 
     if (r.affectedRows === 0) {
       return res.status(404).json({ error: 'ไม่พบรายการ หรือไม่มีสิทธิ์ยกเลิก' })
