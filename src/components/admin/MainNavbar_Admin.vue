@@ -22,11 +22,7 @@ function logout() {
         <span class="brand-accent">Booking Room</span>
       </router-link>
 
-      <!-- ✅ เมนูนำทางฝั่งแอดมิน -->
-      <nav class="nav-links" v-if="auth.isLoggedIn">
-        <router-link class="link" :to="{ name: 'admin.rooms' }">จองห้อง</router-link>
-        <router-link class="link" :to="{ name: 'admin.reviews' }">รีวิว</router-link>
-      </nav>
+      <!-- ✅ ลบเมนูกลางออกแล้ว -->
 
       <!-- ด้านขวา -->
       <div class="nav-right" v-if="auth.isLoggedIn">
@@ -45,12 +41,7 @@ function logout() {
 .brand{ display:inline-flex; gap:8px; text-decoration:none; align-items:baseline; letter-spacing:.5px; }
 .brand-main{ font-weight:800; color:#1f2d3d; font-size:22px; }
 .brand-dot{ color:#94a3b8; user-select:none; }
-.brand-accent{ font-weight:900; color:#5865f2; font-size:22px; line-height:1; } /* ให้ขนาดเข้ากับคำว่า Admin */
-
-.nav-links{ display:inline-flex; align-items:center; gap:22px; }
-.link{ position:relative; font-size:14px; color:#334155; text-decoration:none; padding:4px 0; }
-.link:hover{ color:#111827; }
-.link.router-link-active{ color:#111827; font-weight:600; }
+.brand-accent{ font-weight:900; color:#5865f2; font-size:22px; line-height:1; }
 
 .nav-right{ display:inline-flex; align-items:center; gap:12px; }
 .badge{ font-size:11px; padding:2px 8px; border-radius:999px; margin-left:6px; text-decoration:none; }
@@ -62,6 +53,5 @@ function logout() {
 @media (max-width:720px){
   .brand-main{ font-size:18px; }
   .brand-accent{ font-size:18px; }
-  .nav-links{ gap:14px; }
 }
 </style>
