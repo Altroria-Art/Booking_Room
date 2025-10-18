@@ -4,6 +4,11 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import ReviewRoom from '@/components/user/ReviewRoom.vue'
 import BookingModal from '@/components/user/BookingModal.vue'
 
+/* ✅ โหมดฝังในหน้าแอดมิน: ถ้า true จะซ่อน ReviewRoom */
+const { adminMode } = withDefaults(defineProps<{ adminMode?: boolean }>(), {
+  adminMode: false
+})
+
 const showBooking = ref(false)
 
 /* ===== เวลา =====
@@ -230,7 +235,9 @@ async function handleBooked() {
 
     <!-- ✅ ฟังอีเวนต์ success เพื่อรีโหลด -->
     <BookingModal v-model:open="showBooking" @success="handleBooked" />
-    <ReviewRoom />
+
+    <!-- ✅ ซ่อนรีวิวเมื่อเป็นโหมดแอดมิน -->
+    <ReviewRoom v-if="!adminMode" />
   </div>
 </template>
 
