@@ -1,16 +1,34 @@
 // src/services/api.js
 import api from '@/plugins/axios'   // ถ้าไม่ได้ตั้ง alias '@' ให้เปลี่ยนเป็น '../plugins/axios'
 
-/* ---------- Reviews (ของเดิม) ---------- */
+/* ---------- Reviews (ผู้ใช้) ---------- */
+// ผู้ใช้ดึงรีวิวตามห้อง/แบ่งหน้า
 export const fetchReviews = (params = {}) =>
   api.get('/reviews', { params })       // { page, pageSize, room_id }
 
+// ผู้ใช้สร้างรีวิว
 export const createReview = (payload) =>
-  api.post('/reviews', payload)          // { rating, comment, created_by, room_id? }
+  api.post('/reviews', payload)         // { rating, comment, created_by, room_id? }
 
-/* ---------- Rooms (เพิ่มใหม่สำหรับปุ่มแก้ไข/ลบ) ---------- */
+/* ---------- Admin: Reviews ---------- */
+// แอดมินดึงรีวิวทั้งหมด (รองรับกรองตามดาว)
+export const getAdminReviews = (params = {}) =>
+  api.get('/reviews/admin', { params }) // { page, pageSize, room_id?, rating? }
+
+// แอดมินดึงสรุปจำนวนรีวิวแยกตามดาว (ไว้ทำ chips)
+export const getAdminReviewSummary = (params = {}) =>
+  api.get('/reviews/admin/summary', { params }) // { room_id? }
+
+// แอดมินลบรีวิวตาม id
+export const deleteAdminReview = (id) =>
+  api.delete(`/reviews/admin/${id}`)
+
+// alias เผื่อชอบชื่อแบบ fetch*
+export const fetchAdminReviews = getAdminReviews
+
+/* ---------- Rooms (แก้ไข/ลบ) ---------- */
 export const getRooms = (params = {}) =>
-  api.get('/rooms', { params })          // เผื่อมี filter/query
+  api.get('/rooms', { params })
 
 export const getRoomTypes = () =>
   api.get('/room-types')
@@ -24,9 +42,9 @@ export const updateRoom = (id, payload) =>
 export const deleteRoom = (id) =>
   api.delete(`/rooms/${id}`)
 
-// (ถ้าชอบตั้งชื่อแบบ fetch*)
+// alias
 export const fetchRooms = getRooms
 export const fetchRoomTypes = getRoomTypes
 
-// (ทางเลือก) helper กรองตามประเภท
+// helper กรองตามประเภท
 export const getRoomsByType = (typeId) => getRooms({ typeId })
