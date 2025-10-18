@@ -1,6 +1,7 @@
 <!-- src/modules/user/pages/Rooms.vue -->
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useAuthStore } from '@/store/auth'
 import ReviewRoom from '@/components/user/ReviewRoom.vue'
 import BookingModal from '@/components/user/BookingModal.vue'
 
@@ -15,6 +16,7 @@ const emit = defineEmits<{
   (e: 'admin-edit'): void
 }>()
 
+const auth = useAuthStore()
 const showBooking = ref(false)
 
 /* ===== เวลา =====
@@ -62,20 +64,34 @@ function todayLocalYMD(){
 
 const rooms = ref<Room[]>([])
 const bookings = ref<Booking[]>([])
-let midnightTimer: number | null = null // ✅ ตั้งเวลา reload หลังข้ามวัน
+
+/* ✅ สถานะ: ผู้ใช้มีการจองวันนี้แล้วหรือยัง */
+const hasBookingToday = ref(false)
+const myBooking = ref<Booking | null>(null)
+
+function recomputeMine() {
+  const sid = String(auth.studentId || auth.user?.student_id || '')
+  if (!sid) { hasBookingToday.value = false; myBooking.value = null; return }
+  const mine = bookings.value.find(b => String(b.created_by) === sid) || null
+  hasBookingToday.value = !!mine
+  myBooking.value = mine
+}
+
+let midnightTimer: number | null = null // ตั้งเวลา reload หลังข้ามวัน
 
 async function loadData(){
   const ymd = todayLocalYMD()
-  const bust = Date.now() // ✅ กัน cache
+  const bust = Date.now() // กัน cache
   const [r1, r2] = await Promise.all([
     fetch('/api/rooms', { cache: 'no-store' }).then(r=>r.json()),
     fetch(`/api/bookings?date=${ymd}&_=${bust}`, { cache: 'no-store' }).then(r=>r.json()),
   ])
   rooms.value = r1
   bookings.value = r2
+  recomputeMine() // ✅ คำนวณสถานะของฉันทันทีหลังโหลด
 }
 
-function scheduleMidnightReload(){       // ✅ โหลดใหม่อัตโนมัติหลังเที่ยงคืน
+function scheduleMidnightReload(){       // โหลดใหม่อัตโนมัติหลังเที่ยงคืน
   if (midnightTimer) window.clearTimeout(midnightTimer)
   const now  = new Date()
   const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 1, 0) // 00:01
@@ -85,10 +101,13 @@ function scheduleMidnightReload(){       // ✅ โหลดใหม่อั�
   }, next.getTime() - now.getTime())
 }
 
-onMounted(async () => {                  // ✅ โหลดรอบแรก + ตั้งจับข้ามวัน
+onMounted(async () => {
   await loadData()
   scheduleMidnightReload()
 })
+
+// ถ้า auth เปลี่ยน (เช่น ล็อกอินใหม่) ให้คำนวณใหม่
+watch(() => auth.studentId, recomputeMine)
 
 /* ===== คำนวณบล็อกจอง ===== */
 type Block = { id:number; label:string; left:number; right:number }
@@ -151,7 +170,6 @@ const scheduleRef = ref<HTMLDivElement | null>(null)
 function clampScrollRight() {
   const el = scheduleRef.value
   if (!el) return
-  // ไม่ให้เลื่อนไปเห็นคอลัมน์สุดท้าย (17:00) → กันไว้เท่ากับความกว้าง 1 ชั่วโมง
   const maxAllowed = Math.max(0, el.scrollWidth - el.clientWidth - HOUR_WIDTH)
   if (el.scrollLeft > maxAllowed) el.scrollLeft = maxAllowed
 }
@@ -173,7 +191,18 @@ onUnmounted(() => {
 async function handleBooked() {
   await loadData()
 }
+
+// เพิ่ม/แก้ฟังก์ชันให้ใช้ alert เมื่อมีจองวันนี้แล้ว
+function onClickBook() {
+  if (hasBookingToday.value) {
+    window.alert('วันนี้คุณได้ทำการจองห้องไปแล้ว\nหากต้องการจองใหม่ โปรดยกเลิกการจองปัจจุบันก่อน')
+    return
+  }
+  showBooking.value = true
+}
+
 </script>
+
 
 <template>
   <div class="page rooms">
@@ -200,7 +229,8 @@ async function handleBooked() {
         </template>
 
         <!-- ปุ่มจอง (ผู้ใช้ทั่วไป) -->
-        <button type="button" class="btn-book" @click="showBooking = true">
+        <!-- ใหม่ -->
+        <button type="button" class="btn-book" @click="onClickBook">
           <span>จองห้องประชุมที่นี่</span>
           <svg class="btn-icon" viewBox="0 0 48 48" aria-hidden="true">
             <circle cx="24" cy="24" r="20" fill="#FFFFFF"/>

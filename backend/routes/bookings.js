@@ -57,8 +57,8 @@ async function findConflictsByRoomCode(roomCode, startAt, endAt) {
   const [rows] = await pool.query(
     `SELECT
        b.id, r.room_code,
-       DATE_FORMAT(b.start_at,'%H:%i') AS start_hhmm,
-       DATE_FORMAT(b.end_at,'%H:%i')   AS end_hhmm
+       TIME_FORMAT(b.start_at,'%H:%i') AS start_hhmm,
+       TIME_FORMAT(b.end_at,'%H:%i')   AS end_hhmm
      FROM bookings b
      JOIN rooms r ON r.id = b.room_id
      WHERE r.room_code = ?
@@ -69,6 +69,41 @@ async function findConflictsByRoomCode(roomCode, startAt, endAt) {
   )
   return rows
 }
+
+/* ----------------------------------------------
+   ฟีเจอร์ "เช็คของฉันวันนี้" (ใช้บนหน้า user เพื่อปิดปุ่มจอง)
+   ---------------------------------------------- */
+// GET /api/bookings/my?date=YYYY-MM-DD
+router.get('/my', requireAuth, async (req, res) => {
+  try {
+    res.set('Cache-Control', 'no-store')
+
+    const date = req.query.date || new Date().toISOString().slice(0, 10)
+    const studentId = sanitizeId(req.user?.student_id)
+    if (!studentId) return res.status(401).json({ error: 'Unauthenticated' })
+
+    const [rows] = await pool.query(
+      `SELECT b.id, r.room_code,
+              TIME_FORMAT(b.start_at,'%H:%i') AS start_hhmm,
+              TIME_FORMAT(b.end_at,'%H:%i')   AS end_hhmm
+       FROM bookings b
+       JOIN rooms r ON r.id = b.room_id
+       WHERE b.created_by = ? AND DATE(b.start_at) = ?
+       ORDER BY b.start_at
+       LIMIT 1`,
+      [studentId, date]
+    )
+
+    res.json({
+      date,
+      hasBooking: rows.length > 0,
+      booking: rows[0] || null
+    })
+  } catch (e) {
+    console.error(e)
+    res.status(500).json({ message: 'Server error', detail: e.message })
+  }
+})
 
 // =============================
 // POST /api/bookings
@@ -99,7 +134,21 @@ router.post('/', requireAuth, async (req, res) => {
       return res.status(400).json({ message: `รูปแบบรหัสนิสิตไม่ถูกต้อง: ${bad}` })
     }
 
-    // ✅ PRE-CHECK: รายละเอียดช่วงที่ชน (วันเดียวกัน)
+    // ❗ กันจองซ้ำวันเดียวกันตาม requirement
+    const [myDup] = await pool.query(
+      `SELECT id FROM bookings
+       WHERE created_by = ? AND DATE(start_at) = DATE(?)
+       LIMIT 1`,
+      [createdBy, startAt]
+    )
+    if (myDup.length) {
+      return res.status(409).json({
+        ok: false,
+        message: 'วันนี้คุณได้ทำการจองไปแล้ว (1 คนจองได้ 1 ครั้งต่อวัน)'
+      })
+    }
+
+    // ✅ PRE-CHECK: รายละเอียดช่วงที่ชน (วันเดียวกัน / ห้องเดียวกัน)
     const conflicts = await findConflictsByRoomCode(roomCode, startAt, endAt)
     if (conflicts.length) {
       return res.status(409).json({
@@ -121,7 +170,8 @@ router.post('/', requireAuth, async (req, res) => {
     return res.status(201).json({ ok: true })
   } catch (e) {
     const msg = e?.sqlMessage || e?.message || 'server error'
-    const status = /overlap/i.test(msg) ? 409 : 400
+    // ถ้าข้อความจาก SP แจ้งเรื่อง overlap/duplicate ให้ถือเป็น 409
+    const status = /overlap|duplicate|ซ้ำ|ครั้งต่อวัน/i.test(msg) ? 409 : 400
     return res.status(status).json({ ok: false, message: msg })
   }
 })
