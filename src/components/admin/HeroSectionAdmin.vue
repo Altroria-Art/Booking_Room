@@ -1,7 +1,10 @@
 <script setup>
 import { RouterLink, useRoute } from 'vue-router'
 const route = useRoute()
-const isActive = (name) => route.name === name
+
+// เช็ค active ได้ทั้งจากชื่อ route และสำรองด้วย path
+const isActive = (name, startsWithPath) =>
+  route.name === name || (startsWithPath && route.path.startsWith(startsWithPath))
 </script>
 
 <template>
@@ -22,20 +25,22 @@ const isActive = (name) => route.name === name
       <RouterLink
         :to="{ name: 'admin.rooms' }"
         class="tab-link"
-        :class="{ active: isActive('admin.rooms') }"
+        :class="{ active: isActive('admin.rooms', '/admin/rooms') }"
       >
         จองห้อง
       </RouterLink>
+
+      <!-- ✅ แก้ให้ลิงก์ไปหน้ารีวิวของแอดมิน -->
       <RouterLink
-        to="#"
+        :to="{ name: 'admin.reviews' }"
         class="tab-link"
+        :class="{ active: isActive('admin.reviews', '/admin/reviews') }"
       >
         รีวิว
       </RouterLink>
     </div>
   </section>
 </template>
-
 
 <style scoped>
 .hero {
@@ -51,7 +56,6 @@ const isActive = (name) => route.name === name
   height: 100%;
   object-fit: cover;
 }
-
 .overlay {
   position: absolute;
   inset: 0;
@@ -74,13 +78,12 @@ const isActive = (name) => route.name === name
   margin-left: 30px;
   display: flex;
   gap: 0;
-  width: 300px; /* ความกว้างรวมของปุ่มทั้งคู่ (ปรับได้ตามต้องการ) */
+  width: 300px;
 }
-
 .tab-link {
-  flex: 1; /* ให้แบ่งพื้นที่เท่ากัน */
+  flex: 1;
   text-align: center;
-  padding: 12px 0; /* ใช้ padding บน-ล่างเท่านั้น เพื่อให้เท่ากันเป๊ะ */
+  padding: 12px 0;
   border: 1px solid rgba(255,255,255,.45);
   background: rgba(15,23,42,.45);
   color: #fff;
@@ -89,19 +92,11 @@ const isActive = (name) => route.name === name
   cursor: pointer;
   backdrop-filter: blur(2px);
   transition: background .15s ease, color .15s ease, box-shadow .15s ease;
-
   text-decoration: none;
 }
-
-.tab-link:hover{
-  background: rgba(15,23,42,.6);
-}
-
-/* มุมโค้งเฉพาะซ้าย/ขวา */
+.tab-link:hover{ background: rgba(15,23,42,.6); }
 .tab-link:first-child{ border-top-left-radius: 10px; }
 .tab-link:last-child { border-top-right-radius: 10px; }
-
-/* ✅ ปุ่มที่ active = พื้นขาวเหมือนภาพ */
 .tab-link.active{
   background: #ffffff;
   color: #111827;

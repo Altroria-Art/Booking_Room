@@ -5,8 +5,9 @@ import { createRouter, createWebHistory } from 'vue-router'
 const Login = () => import('../modules/auth/Login.vue')
 
 // Admin
-const AdminLayout = () => import('../layouts/AdminLayout.vue')
-const AdminRooms  = () => import('../modules/admin/pages/Rooms.vue')
+const AdminLayout   = () => import('../layouts/AdminLayout.vue')
+const AdminRooms    = () => import('../modules/admin/pages/Rooms.vue')
+const AdminReviews  = () => import('../modules/admin/pages/Reviews.vue')
 
 // User
 const UserLayout  = () => import('../layouts/UserLayout.vue')
@@ -26,7 +27,19 @@ const routes = [
     component: AdminLayout,
     children: [
       { path: '', redirect: { name: 'admin.rooms' } },
-      { path: 'rooms', name: 'admin.rooms', component: AdminRooms },
+      {
+        path: 'rooms',
+        name: 'admin.rooms',
+        component: AdminRooms,
+        meta: { showAdminHero: true }   // ✅ ให้ Hero จาก Layout แสดง
+      },
+      {
+        path: 'reviews',
+        name: 'admin.reviews',
+        component: AdminReviews,
+        meta: { showAdminHero: true }   // ✅ ให้ Hero จาก Layout แสดง
+      },
+      // ถ้าหน้าใดไม่ต้องการ Hero ให้ตั้งเป็น false
     ],
   },
 
@@ -37,12 +50,11 @@ const routes = [
     children: [
       { path: '', redirect: { name: 'user.rooms' } },
 
-      // ชื่อหลักที่แนะนำให้ใช้
       { path: 'rooms',   name: 'user.rooms',   component: UserRooms },
       { path: 'review',  name: 'user.review',  component: UserReview },
       { path: 'history', name: 'user.history', component: UserHistory },
 
-      // ✅ ชื่อเดิมเพื่อความเข้ากันได้กับโค้ดเก่า (push โดย name เดิม)
+      // ชื่อเดิมเพื่อความเข้ากันได้
       { path: 'rooms-compat',   name: 'rooms',   redirect: { name: 'user.rooms' } },
       { path: 'review-compat',  name: 'review',  redirect: { name: 'user.review' } },
       { path: 'history-compat', name: 'history', redirect: { name: 'user.history' } },
