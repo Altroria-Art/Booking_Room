@@ -2,30 +2,28 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 
-// ----- Pages -----
+// ===== Pages =====
 const Login        = () => import('@/modules/auth/Login.vue')
 
-// ----- Layouts -----
+// ===== Layouts =====
 const UserLayout   = () => import('@/layouts/UserLayout.vue')
 const AdminLayout  = () => import('@/layouts/AdminLayout.vue')
 
-// ----- User pages -----
+// ===== User pages =====
 const UserRooms    = () => import('@/modules/user/pages/Rooms.vue')
 const UserReview   = () => import('@/modules/user/pages/Review.vue')
 // ถ้ายังไม่มีหน้า History ใช้ Rooms แทนก่อน
 const UserHistory  = UserRooms
 
-// ----- Admin pages -----
+// ===== Admin pages =====
 const AdminRooms   = () => import('@/modules/admin/pages/Rooms.vue')
 const AdminReviews = () => import('@/modules/admin/pages/Reviews.vue')
 
 const routes = [
   { path: '/', redirect: { name: 'login' } },
 
-  // เข้าหน้า login ได้เสมอ (แม้ล็อกอินอยู่)
-  { path: '/login', name: 'login', component: Login, meta: { public: true } },
-
-  // เส้นทางลัดออกจากระบบ
+  // public
+  { path: '/login',  name: 'login',  component: Login,  meta: { public: true } },
   {
     path: '/logout',
     name: 'logout',
@@ -43,23 +41,38 @@ const routes = [
     component: UserLayout,
     meta: { requiresAuth: true },
     children: [
-      { path: '', redirect: { name: 'user.rooms' } },
-      { path: 'rooms',   name: 'user.rooms',   component: UserRooms },
-      { path: 'review',  name: 'user.review',  component: UserReview },
-      { path: 'history', name: 'user.history', component: UserHistory },
+      { path: '',         redirect: { name: 'user.rooms' } },
+      { path: 'rooms',    name: 'user.rooms',   component: UserRooms },
+      { path: 'review',   name: 'user.review',  component: UserReview },
+      { path: 'history',  name: 'user.history', component: UserHistory },
     ],
   },
 
-  // ===== Admin (มี Layout + Hero) =====
+  // ===== Admin (มี Layout + Guard แอดมิน) =====
   {
     path: '/admin',
     component: AdminLayout,
     meta: { requiresAuth: true, requiresAdmin: true },
     children: [
-      { path: '', redirect: { name: 'admin.rooms' } },
-      // ค่าเริ่มต้น: Hero โชว์ (ตั้ง false ที่ meta ของหน้าใดหน้า1 ถ้าไม่อยากให้โชว์)
-      { path: 'rooms',   name: 'admin.rooms',   component: AdminRooms,   meta: { showAdminHero: true } },
-      { path: 'reviews', name: 'admin.reviews', component: AdminReviews, meta: { showAdminHero: true } },
+      { path: '',        redirect: { name: 'admin.rooms' } },
+
+      // แสดง Hero ที่หน้า rooms
+      {
+        path: 'rooms',
+        name: 'admin.rooms',
+        component: AdminRooms,
+        meta: { showAdminHero: true },
+      },
+
+      // หน้ารีวิวของแอดมิน (ซ่อน Hero เพื่อให้โฟกัสที่เนื้อหา)
+      {
+        path: 'reviews',
+        name: 'admin.reviews',
+        component: AdminReviews,
+        meta: { showAdminHero: false },
+        // รองรับพาธเอกพจน์ /admin/review ถ้าเผลอใช้
+        alias: ['/admin/review'],
+      },
     ],
   },
 
@@ -68,24 +81,29 @@ const routes = [
   { path: '/review',  redirect: { name: 'user.review' } },
   { path: '/history', redirect: { name: 'user.history' } },
 
+  // 404 → login
   { path: '/:pathMatch(.*)*', redirect: { name: 'login' } },
 ]
 
 const router = createRouter({
   history: createWebHistory(),
   routes,
+  // เลื่อนขึ้นบนเมื่อเปลี่ยนหน้า (โดยเฉพาะจาก hero ไปรีวิว)
+  scrollBehavior() {
+    return { top: 0 }
+  },
 })
 
 // ===== Guard: hydrate + ตรวจสิทธิ์ =====
-router.beforeEach((to, _from, next) => {
+router.beforeEach(async (to, _from, next) => {
   const auth = useAuthStore()
 
-  // ฟื้น state หลังรีเฟรช
+  // ฟื้น state หลังรีเฟรช (ถ้า hydrate เป็น async ให้รอ)
   if (!auth.user && (localStorage.getItem('user') || localStorage.getItem('token'))) {
-    auth.hydrate?.()
+    await (auth.hydrate?.())
   }
 
-  // หน้า public (เช่น /login, /logout) → อนุญาตเสมอ
+  // หน้า public → อนุญาตเสมอ
   if (to.matched.some(r => r.meta?.public)) {
     return next()
   }
