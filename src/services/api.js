@@ -1,6 +1,11 @@
 // src/services/api.js
 import api from '@/plugins/axios'   // ถ้าไม่ได้ตั้ง alias '@' ให้เปลี่ยนเป็น '../plugins/axios'
 
+export const fetchMyLatestBooking = () =>
+  api.get('/bookings/my-latest')   // ใช้ token จาก axios interceptor
+
+export const cancelBooking = (bookingId) =>
+  api.delete(`/bookings/${bookingId}`)
 /* ---------- Reviews (ผู้ใช้) ---------- */
 // ผู้ใช้ดึงรีวิวตามห้อง/แบ่งหน้า
 export const fetchReviews = (params = {}) =>

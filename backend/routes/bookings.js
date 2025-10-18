@@ -99,7 +99,7 @@ router.post('/', requireAuth, async (req, res) => {
       return res.status(400).json({ message: `รูปแบบรหัสนิสิตไม่ถูกต้อง: ${bad}` })
     }
 
-    // ✅ PRE-CHECK: lock date + รายละเอียดช่วงที่ชน
+    // ✅ PRE-CHECK: รายละเอียดช่วงที่ชน (วันเดียวกัน)
     const conflicts = await findConflictsByRoomCode(roomCode, startAt, endAt)
     if (conflicts.length) {
       return res.status(409).json({
@@ -123,6 +123,85 @@ router.post('/', requireAuth, async (req, res) => {
     const msg = e?.sqlMessage || e?.message || 'server error'
     const status = /overlap/i.test(msg) ? 409 : 400
     return res.status(status).json({ ok: false, message: msg })
+  }
+})
+
+/* ----------------------------------------------
+   เพิ่มสำหรับฟีเจอร์ "หลักฐานการจอง"
+   ---------------------------------------------- */
+
+// 4.1 ดูการจองล่าสุดของ user ที่กำลังล็อกอิน
+// GET /api/bookings/my-latest
+router.get('/my-latest', requireAuth, async (req, res) => {
+  try {
+    res.set('Cache-Control', 'no-store')
+
+    const studentId = req.user?.student_id
+    if (!studentId) return res.status(401).json({ error: 'Unauthenticated' })
+
+    // เลือก "รายการล่าสุด" โดยเรียงจาก start_at ล่าสุด
+    const [rows] = await pool.query(
+      `SELECT b.id, b.room_id, r.room_code, b.start_at, b.end_at, b.created_by
+       FROM bookings b
+       JOIN rooms r ON r.id = b.room_id
+       WHERE b.created_by = ?
+       ORDER BY b.start_at DESC
+       LIMIT 1`,
+      [studentId]
+    )
+
+    if (rows.length === 0) {
+      return res.json(null) // ฝั่งหน้าเว็บจะตีความว่า "ยังไม่ได้จอง"
+    }
+
+    const booking = rows[0]
+    const [mems] = await pool.query(
+      'SELECT student_id FROM booking_members WHERE booking_id = ? ORDER BY id ASC',
+      [booking.id]
+    )
+
+    // ถ้า stored procedure ใส่ owner เข้า booking_members ด้วย ให้ตัด owner ออก
+    const members = mems.map(m => m.student_id).filter(sid => sid !== booking.created_by)
+
+    return res.json({
+      id: booking.id,
+      room_code: booking.room_code,
+      start_at: booking.start_at,
+      end_at: booking.end_at,
+      members
+    })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Internal error' })
+  }
+})
+
+// 4.2 ยกเลิกการจอง (ลบ)
+// DELETE /api/bookings/:id
+// แนะนำให้ schema ตั้ง FK booking_members.booking_id → bookings.id เป็น ON DELETE CASCADE
+router.delete('/:id', requireAuth, async (req, res) => {
+  try {
+    const bookingId = Number(req.params.id)
+    const studentId = req.user?.student_id
+    if (!studentId) return res.status(401).json({ error: 'Unauthenticated' })
+
+    // ลบเฉพาะรายการที่ตัวเองเป็นผู้จอง
+    const [r] = await pool.query(
+      'DELETE FROM bookings WHERE id = ? AND created_by = ?',
+      [bookingId, studentId]
+    )
+
+    // ถ้า schema ของคุณยังไม่ได้ cascade:
+    // await pool.query('DELETE FROM booking_members WHERE booking_id = ?', [bookingId])
+    // const [r] = await pool.query('DELETE FROM bookings WHERE id = ? AND created_by = ?', [bookingId, studentId])
+
+    if (r.affectedRows === 0) {
+      return res.status(404).json({ error: 'ไม่พบรายการ หรือไม่มีสิทธิ์ยกเลิก' })
+    }
+    return res.json({ ok: true })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Internal error' })
   }
 })
 
