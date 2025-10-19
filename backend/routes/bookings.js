@@ -263,6 +263,50 @@ router.get('/my-latest', requireAuth, async (req, res) => {
   }
 })
 
+/* ----------------------------------------------
+   DELETE /api/bookings/:id  ← ผู้ใช้ยกเลิกของตัวเอง (ใหม่)
+---------------------------------------------- */
+router.delete('/:id(\\d+)', requireAuth, async (req, res) => {
+  const id = Number(req.params.id || 0)
+  if (!id) return res.status(400).json({ error: 'invalid_id' })
+
+  // รองรับได้ทั้ง student_id และ studentId
+  const sid = sanitizeId(req.user?.student_id || req.user?.studentId)
+  if (!sid) return res.status(401).json({ error: 'unauthorized' })
+
+  const conn = await pool.getConnection()
+  try {
+    await conn.beginTransaction()
+
+    // ล็อกแถวและตรวจว่าเป็นเจ้าของจริง
+    const [rows] = await conn.query(
+      'SELECT id, created_by FROM bookings WHERE id = ? FOR UPDATE',
+      [id]
+    )
+    if (rows.length === 0) {
+      await conn.rollback()
+      return res.status(404).json({ error: 'not_found' })
+    }
+    if (String(rows[0].created_by) !== sid) {
+      await conn.rollback()
+      return res.status(403).json({ error: 'forbidden' })
+    }
+
+    // ลบสมาชิกก่อน เพื่อรองรับ schema ที่ไม่ตั้ง CASCADE
+    await conn.query('DELETE FROM booking_members WHERE booking_id = ?', [id])
+    const [ret] = await conn.query('DELETE FROM bookings WHERE id = ?', [id])
+
+    await conn.commit()
+    return res.json({ success: !!ret.affectedRows })
+  } catch (e) {
+    await conn.rollback()
+    console.error('DELETE /bookings/:id failed', e)
+    return res.status(500).json({ error: 'server_error' })
+  } finally {
+    conn.release()
+  }
+})
+
 /* =================================================================
    ==============      ADMIN ENDPOINTS (ใหม่)      ==================
 ================================================================= */
@@ -341,7 +385,7 @@ router.get('/admin/:id', requireAuth, ensureAdmin, async (req, res) => {
       room_code: row.room_code,
       start_at: row.start_at,
       end_at: row.end_at,
-      start_hhmm: row.start_hhmm,   // ← ส่งเป็น 'HH:mm' ชัดเจน
+      start_hhmm: row.start_hhmm,
       end_hhmm:   row.end_hhmm,
       created_by: row.created_by,
       display_name: row.display_name || null,
