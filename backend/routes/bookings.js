@@ -5,15 +5,54 @@ import { requireAuth } from '../middlewares/auth.js'
 
 const router = express.Router()
 
-// =============================
-// GET /api/bookings?date=YYYY-MM-DD[&roomCode=CE08203]
-// =============================
+/* ----------------------------------------------
+   helpers
+---------------------------------------------- */
+const sanitizeId = (s) => String(s || '').replace(/\s+/g, '').trim()
+const validStudentId = (id) => /^\d{8,10}$/.test(id)
+
+// ✅ ensure admin: รองรับ 'ADMIN'/'admin', boolean, 1, '1', 'true'
+const ensureAdmin = (req, res, next) => {
+  const u = req.user || {}
+  const role = String(u.role || '').toLowerCase()
+
+  const isAdmin =
+    role === 'admin' ||
+    u.is_admin === true || u.isAdmin === true ||
+    u.is_admin === 1    || u.isAdmin === 1 ||
+    String(u.is_admin) === '1' || String(u.isAdmin) === '1' ||
+    String(u.is_admin).toLowerCase() === 'true' || String(u.isAdmin).toLowerCase() === 'true'
+
+  if (isAdmin) return next()
+  return res.status(403).json({ error: 'forbidden' })
+}
+
+// หา conflict เฉพาะ “วันเดียวกัน”
+async function findConflictsByRoomCode(roomCode, startAt, endAt) {
+  const [rows] = await pool.query(
+    `SELECT
+       b.id, r.room_code,
+       TIME_FORMAT(b.start_at,'%H:%i') AS start_hhmm,
+       TIME_FORMAT(b.end_at,'%H:%i')   AS end_hhmm
+     FROM bookings b
+     JOIN rooms r ON r.id = b.room_id
+     WHERE r.room_code = ?
+       AND DATE(b.start_at) = DATE(?)
+       AND NOT (b.end_at <= ? OR b.start_at >= ?)
+     ORDER BY b.start_at`,
+    [roomCode, startAt, startAt, endAt]
+  )
+  return rows
+}
+
+/* ----------------------------------------------
+   GET /api/bookings?date=YYYY-MM-DD[&roomCode=...]
+---------------------------------------------- */
 router.get('/', async (req, res) => {
   try {
     const date = req.query.date || new Date().toLocaleDateString('sv-SE')
     const roomCode = req.query.roomCode || null
 
-    // กัน cache
     res.set('Cache-Control', 'no-store')
 
     const params = [date]
@@ -43,37 +82,9 @@ router.get('/', async (req, res) => {
   }
 })
 
-/* ถ้า DB เก็บเป็น UTC:
-   TIME_FORMAT(CONVERT_TZ(b.start_at,'+00:00','+07:00'),'%H:%i')
-   และ WHERE DATE(CONVERT_TZ(b.start_at,'+00:00','+07:00')) = ?
-*/
-
-// ===== helper =====
-const sanitizeId = (s) => String(s || '').replace(/\s+/g, '').trim()
-const validStudentId = (id) => /^\d{8,10}$/.test(id)
-
-// ✅ หา conflict เฉพาะ “วันเดียวกัน”
-async function findConflictsByRoomCode(roomCode, startAt, endAt) {
-  const [rows] = await pool.query(
-    `SELECT
-       b.id, r.room_code,
-       TIME_FORMAT(b.start_at,'%H:%i') AS start_hhmm,
-       TIME_FORMAT(b.end_at,'%H:%i')   AS end_hhmm
-     FROM bookings b
-     JOIN rooms r ON r.id = b.room_id
-     WHERE r.room_code = ?
-       AND DATE(b.start_at) = DATE(?)
-       AND NOT (b.end_at <= ? OR b.start_at >= ?)
-     ORDER BY b.start_at`,
-    [roomCode, startAt, startAt, endAt]
-  )
-  return rows
-}
-
 /* ----------------------------------------------
-   ฟีเจอร์ "เช็คของฉันวันนี้" (ใช้บนหน้า user / หลักฐานการจอง)
-   ---------------------------------------------- */
-// GET /api/bookings/my?date=YYYY-MM-DD[&roomCode=CE08202]
+   GET /api/bookings/my?date=YYYY-MM-DD[&roomCode=...]
+---------------------------------------------- */
 router.get('/my', requireAuth, async (req, res) => {
   try {
     res.set('Cache-Control', 'no-store')
@@ -81,13 +92,11 @@ router.get('/my', requireAuth, async (req, res) => {
     const date = req.query.date || new Date().toISOString().slice(0, 10)
     const roomCode = req.query.roomCode || null
 
-    // ใช้ helper เดิมของไฟล์คุณ
     const studentId = sanitizeId(req.user?.student_id)
     if (!studentId) {
       return res.status(401).json({ ok: false, message: 'Unauthenticated' })
     }
 
-    // NOTE: รักษา "shape การตอบกลับ" เดิมของคุณ => { ok, date, data }
     const params = [studentId, date]
     const roomFilter = roomCode ? ' AND r.room_code = ? ' : ''
     if (roomCode) params.push(roomCode)
@@ -115,7 +124,6 @@ router.get('/my', requireAuth, async (req, res) => {
 
     const booking = rows[0]
 
-    // ดึง "ผู้ร่วมจอง" ทั้งหมดของรายการนี้ (ไม่รวมเจ้าของ)
     const [mems] = await pool.query(
       `SELECT student_id
          FROM booking_members
@@ -134,9 +142,9 @@ router.get('/my', requireAuth, async (req, res) => {
   }
 })
 
-// =============================
-// POST /api/bookings
-// =============================
+/* ----------------------------------------------
+   POST /api/bookings
+---------------------------------------------- */
 router.post('/', requireAuth, async (req, res) => {
   try {
     const { roomCode, startAt, endAt, members } = req.body || {}
@@ -150,7 +158,6 @@ router.post('/', requireAuth, async (req, res) => {
       return res.status(400).json({ message: 'your account has no student_id' })
     }
 
-    // รวม owner + ล้าง/ตัดซ้ำ
     let list = [createdBy, ...members.map(sanitizeId)].filter(Boolean)
     list = Array.from(new Set(list))
 
@@ -163,7 +170,6 @@ router.post('/', requireAuth, async (req, res) => {
       return res.status(400).json({ message: `รูปแบบรหัสนิสิตไม่ถูกต้อง: ${bad}` })
     }
 
-    // ❗ กันจองซ้ำวันเดียวกันตาม requirement
     const [myDup] = await pool.query(
       `SELECT id FROM bookings
        WHERE created_by = ? AND DATE(start_at) = DATE(?)
@@ -177,7 +183,6 @@ router.post('/', requireAuth, async (req, res) => {
       })
     }
 
-    // ✅ PRE-CHECK: รายละเอียดช่วงที่ชน (วันเดียวกัน / ห้องเดียวกัน)
     const conflicts = await findConflictsByRoomCode(roomCode, startAt, endAt)
     if (conflicts.length) {
       return res.status(409).json({
@@ -187,7 +192,6 @@ router.post('/', requireAuth, async (req, res) => {
       })
     }
 
-    // เรียก Stored Procedure ให้ DB เป็นตัวตัดสินรอบสุดท้าย
     await pool.query('CALL CreateBooking(?, ?, ?, ?, ?)', [
       roomCode,
       startAt,
@@ -205,9 +209,8 @@ router.post('/', requireAuth, async (req, res) => {
 })
 
 /* ----------------------------------------------
-   ฟีเจอร์ "หลักฐานการจอง" (คง endpoint เดิมเพื่อความเข้ากันได้)
-   ---------------------------------------------- */
-// GET /api/bookings/my-latest[?date=YYYY-MM-DD]
+   GET /api/bookings/my-latest
+---------------------------------------------- */
 router.get('/my-latest', requireAuth, async (req, res) => {
   try {
     res.set('Cache-Control', 'no-store')
@@ -217,7 +220,6 @@ router.get('/my-latest', requireAuth, async (req, res) => {
     const date = req.query.date
 
     if (date) {
-      // ถ้าส่ง date มา → ทำงานแบบ "ของฉันวันนี้"
       const [rows] = await pool.query(
         `SELECT b.id, b.room_id, r.room_code, b.start_at, b.end_at, b.created_by
          FROM bookings b
@@ -237,7 +239,6 @@ router.get('/my-latest', requireAuth, async (req, res) => {
       return res.json({ ...booking, members })
     }
 
-    // ไม่ส่ง date → คืนรายการล่าสุด (เพื่อเข้ากันได้กับโค้ดเดิม)
     const [rows] = await pool.query(
       `SELECT b.id, b.room_id, r.room_code, b.start_at, b.end_at, b.created_by
        FROM bookings b
@@ -262,25 +263,113 @@ router.get('/my-latest', requireAuth, async (req, res) => {
   }
 })
 
-// DELETE /api/bookings/:id (ยกเลิกของตัวเอง)
-router.delete('/:id', requireAuth, async (req, res) => {
-  try {
-    const bookingId = Number(req.params.id)
-    const studentId = req.user?.student_id
-    if (!studentId) return res.status(401).json({ error: 'Unauthenticated' })
+/* =================================================================
+   ==============      ADMIN ENDPOINTS (ใหม่)      ==================
+================================================================= */
 
-    const [r] = await pool.query(
-      'DELETE FROM bookings WHERE id = ? AND created_by = ?',
-      [bookingId, studentId]
+/** GET /api/bookings/admin?date=YYYY-MM-DD[&roomCode=...] */
+router.get('/admin', requireAuth, ensureAdmin, async (req, res) => {
+  try {
+    const date = req.query.date || new Date().toLocaleDateString('sv-SE')
+    const roomCode = req.query.roomCode || null
+
+    res.set('Cache-Control', 'no-store')
+
+    const params = [date]
+    const roomFilter = roomCode ? ' AND r.room_code = ? ' : ''
+    if (roomCode) params.push(roomCode)
+
+    const [rows] = await pool.query(
+      `SELECT
+         b.id, b.room_id, r.room_code,
+         b.start_at, b.end_at,
+         TIME_FORMAT(b.start_at, '%H:%i') AS start_hhmm,
+         TIME_FORMAT(b.end_at,   '%H:%i') AS end_hhmm,
+         b.created_by,
+         COALESCE(u.display_name, '') AS display_name
+       FROM bookings b
+       JOIN rooms r ON r.id = b.room_id
+       LEFT JOIN users u ON u.student_id = b.created_by
+       WHERE DATE(b.start_at) = ? ${roomFilter}
+       ORDER BY r.room_code, b.start_at`,
+      params
     )
 
-    if (r.affectedRows === 0) {
-      return res.status(404).json({ error: 'ไม่พบรายการ หรือไม่มีสิทธิ์ยกเลิก' })
-    }
-    return res.json({ ok: true })
-  } catch (err) {
-    console.error(err)
-    res.status(500).json({ error: 'Internal error' })
+    res.json(rows)
+  } catch (e) {
+    console.error('GET /bookings/admin failed', e)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+/** ✅ GET /api/bookings/admin/:id → รายละเอียดรายการเดียวสำหรับโมดัล */
+router.get('/admin/:id', requireAuth, ensureAdmin, async (req, res) => {
+  try {
+    const id = Number(req.params.id)
+    console.log('[ADMIN] GET /bookings/admin/%s', id)
+
+    const [rows] = await pool.query(
+      `SELECT
+         b.id, b.room_id, r.room_code,
+         b.start_at, b.end_at,
+         TIME_FORMAT(b.start_at, '%H:%i') AS start_hhmm,
+         TIME_FORMAT(b.end_at,   '%H:%i') AS end_hhmm,
+         b.created_by,
+         COALESCE(u.display_name,'') AS display_name
+       FROM bookings b
+       JOIN rooms r ON r.id = b.room_id
+       LEFT JOIN users u ON u.student_id = b.created_by
+       WHERE b.id = ?
+       LIMIT 1`,
+      [id]
+    )
+    if (!rows.length) return res.status(404).json({ error: 'not found' })
+    const row = rows[0]
+
+    const [members] = await pool.query(
+      `SELECT student_id
+         FROM booking_members
+        WHERE booking_id = ?
+        ORDER BY id`,
+      [id]
+    )
+
+    res.set('Cache-Control', 'no-store')
+    res.json({
+      id: row.id,
+      room_id: row.room_id,
+      room_code: row.room_code,
+      start_at: row.start_at,
+      end_at: row.end_at,
+      start_hhmm: row.start_hhmm,   // ← ส่งเป็น 'HH:mm' ชัดเจน
+      end_hhmm:   row.end_hhmm,
+      created_by: row.created_by,
+      display_name: row.display_name || null,
+      members: members.map(m => m.student_id).filter(s => s !== row.created_by),
+    })
+  } catch (e) {
+    console.error('GET /bookings/admin/:id failed', e)
+    res.status(500).json({ error: 'server_error' })
+  }
+})
+
+/** DELETE /api/bookings/admin/:id → แอดมินยกเลิกการจอง */
+router.delete('/admin/:id', requireAuth, ensureAdmin, async (req, res) => {
+  const conn = await pool.getConnection()
+  try {
+    const id = req.params.id
+    await conn.beginTransaction()
+    await conn.query('DELETE FROM booking_members WHERE booking_id = ?', [id])
+    const [ret] = await conn.query('DELETE FROM bookings WHERE id = ?', [id])
+    await conn.commit()
+    if (!ret.affectedRows) return res.status(404).json({ error: 'not found' })
+    res.json({ success: true })
+  } catch (e) {
+    await conn.rollback()
+    console.error('DELETE /bookings/admin/:id failed', e)
+    res.status(500).json({ error: 'server_error' })
+  } finally {
+    conn.release()
   }
 })
 

@@ -39,7 +39,7 @@ export const fetchMyLatestBooking = () =>
   api.get('/bookings/my-latest', { params: stamp(), ...noStore })
 
 export const cancelBooking        = (bookingId) =>
-  api.delete(`/bookings/${bookingId}`)
+  api.delete(`/bookings/${bookingId}`) // ผู้ใช้ยกเลิกของตัวเอง
 
 // generic booking (เผื่อหน้าอื่นใช้)
 export const fetchBookings        = (params = {}) => api.get('/bookings', { params })
@@ -57,7 +57,21 @@ export const createReview         = (payload)      => api.post('/reviews', paylo
 export const getAdminReviews        = (params = {}) => api.get('/reviews/admin', { params })           // { page, pageSize, room_id?, rating? }
 export const getAdminReviewSummary  = (params = {}) => api.get('/reviews/admin/summary', { params })
 export const deleteAdminReview      = (id)            => api.delete(`/reviews/admin/${id}`)
-export const getAdminBookings       = (params = {}) => api.get('/bookings/admin', { params })
+
+// ✅ รายการจองของวัน (กันแคช + no-store) — คืน .data ให้เลย
+export const getAdminBookings       = (params = {}) =>
+  api.get('/bookings/admin', { params: stamp(params), ...noStore }).then(r => r.data)
+
+// ✅ ใช้กับป๊อปอัพยกเลิกการจอง (แอดมิน) — คืน .data ให้เลย
+export const getAdminBooking        = (id) =>
+  api.get(`/bookings/admin/${id}`, { params: stamp(), ...noStore }).then(r => r.data)
+
+export const cancelAdminBooking     = (id) =>
+  api.delete(`/bookings/admin/${id}`).then(r => r.data)
+
+/* ========= Convenience helpers (คงชื่อเดิมไว้) ========= */
+export const getAdminBookingsData = (params = {}) => getAdminBookings(params)
+export const getAdminBookingData  = (id) => getAdminBooking(id)
 
 /* ===================================
  * default export (เผื่อบางไฟล์ import แบบ default)
@@ -72,13 +86,17 @@ export default {
   // rooms
   fetchRooms, createRoom, updateRoom, deleteRoom, toggleRoomActive,
 
-  // bookings
+  // bookings (ผู้ใช้)
   fetchMyBooking, fetchMyBookingToday, fetchMyLatestBooking, cancelBooking,
   fetchBookings, createBooking,
 
-  // reviews
+  // reviews (ผู้ใช้)
   fetchReviews, createReview,
 
   // admin
-  getAdminReviews, getAdminReviewSummary, deleteAdminReview, getAdminBookings,
+  getAdminReviews, getAdminReviewSummary, deleteAdminReview,
+  getAdminBookings, getAdminBooking, cancelAdminBooking,
+
+  // helpers ที่คืน .data
+  getAdminBookingsData, getAdminBookingData,
 }

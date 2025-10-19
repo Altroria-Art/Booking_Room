@@ -6,16 +6,25 @@ import { useAuthStore } from '@/store/auth'
  * baseURL rules:
  * - ถ้าไม่ตั้ง VITE_API_BASE → ใช้ '/api' (เหมาะกับ dev proxy)
  * - ถ้าตั้งเป็น URL เต็ม เช่น 'http://localhost:3000/api' → ใช้ตามนั้น
- * - ถ้าตั้งเป็นแค่ host เช่น 'http://localhost:3000' → จะเติม '/api' ให้เอง
+ * - ถ้าตั้งเป็น host เช่น 'http://localhost:3000' → จะเติม '/api' ให้เอง
+ * - ถ้าตั้งเป็น path เช่น '/backend' → จะได้ '/backend/api'
+ * - ถ้าตั้งเป็น '/api' อยู่แล้ว → ไม่เติมซ้ำ
  */
 function resolveBaseURL() {
-  const raw = (import.meta.env.VITE_API_BASE || '').trim().replace(/\/$/, '')
+  let raw = (import.meta.env.VITE_API_BASE || '').trim()
+
+  // ตัด slash ท้าย (ยกเว้นกรณีเป็นแค่ "/")
+  if (raw.length > 1) raw = raw.replace(/\/+$/, '')
+
   if (!raw) return '/api'
+
+  // ถ้าเป็น URL เต็ม
   if (/^https?:\/\//i.test(raw)) {
-    // เป็น URL เต็ม: ถ้าไม่มี /api ต่อท้าย ให้เติมให้
     return raw.endsWith('/api') ? raw : `${raw}/api`
   }
-  // เป็น path ภายใน เช่น '/backend' → เติม /api ต่อท้าย
+
+  // ถ้าเป็น path ภายในโปรเจกต์
+  if (raw === '/' || raw === '/api' || raw.endsWith('/api')) return raw
   return `${raw}/api`
 }
 
@@ -33,34 +42,30 @@ api.interceptors.request.use((config) => {
   try {
     const auth = useAuthStore()
     token = auth?.token
-  } catch { /* Pinia ยังไม่พร้อม */ }
+  } catch {
+    /* Pinia ยังไม่พร้อม */
+  }
 
   if (!token) token = localStorage.getItem('token')
   if (!token && import.meta.env.VITE_DEV_TOKEN) {
-    token = import.meta.env.VITE_DEV_TOKEN // ใช้ร่วมกับ ALLOW_DEV_TOKEN=1 ฝั่ง backend
+    // ใช้ DEV TOKEN ได้ถ้า backend เปิด ALLOW_DEV_TOKEN
+    token = import.meta.env.VITE_DEV_TOKEN
   }
 
   if (token && !headers.Authorization) {
     headers.Authorization = `Bearer ${token}`
   }
   headers.Accept = headers.Accept || 'application/json'
+  headers['X-Requested-With'] = headers['X-Requested-With'] || 'XMLHttpRequest'
   return config
 })
 
-// Log error ให้อ่านง่าย (เลือกเด้งออกเมื่อ 401 ได้)
+// log error ให้อ่านง่าย
 api.interceptors.response.use(
   (r) => r,
   (err) => {
     const { status, data } = err?.response || {}
     console.error('[API ERROR]', status, data || err.message)
-
-    // ถ้าต้องการ auto logout เมื่อ 401:
-    // if (status === 401) {
-    //   try { useAuthStore().$reset() } catch {}
-    //   localStorage.removeItem('token')
-    //   // location.href = '/login'
-    // }
-
     return Promise.reject(err)
   }
 )
