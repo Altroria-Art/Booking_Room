@@ -14,29 +14,26 @@ const { adminMode } = withDefaults(defineProps<{ adminMode?: boolean }>(), {
 const emit = defineEmits<{
   (e: 'admin-add'): void
   (e: 'admin-edit'): void
+  (e: 'admin-open-cancel', bookingId: number): void
 }>()
 
 const auth = useAuthStore()
 const showBooking = ref(false)
 
-/* ===== เวลา =====
-   - เวลาจริง (DB) ปิด 16:00
-   - UI แสดงหัวถึง 17:00 เพื่อให้บล็อกที่จบ 16:00 ยืดภาพไปชน 17:00 ได้
-*/
+/* ===== เวลา ===== */
 const START_HOUR        = 8
 const BUSINESS_END_HOUR = 16
 const DISPLAY_END_HOUR  = 17
 const HOUR_WIDTH        = 140 // px ต่อ 1 ชั่วโมง
 
-// ช่วงโชว์หัว 08..17
-const DISPLAY_INTERVALS = DISPLAY_END_HOUR - START_HOUR   // 9
-const CANVAS_COLS       = DISPLAY_INTERVALS + 1           // 10
+const DISPLAY_INTERVALS = DISPLAY_END_HOUR - START_HOUR
+const CANVAS_COLS       = DISPLAY_INTERVALS + 1
 const CANVAS_W          = computed(() => CANVAS_COLS * HOUR_WIDTH)
 
-// ===== จำกัดจำนวนห้องที่มองเห็นทีละ 10 แถว (ที่เหลือเลื่อนลง) =====
-const ROW_HEIGHT    = 56   // ความสูงแถวห้อง (ให้ตรงกับ CSS)
-const HEADER_HEIGHT = 56   // ความสูงแถวหัวตาราง (ให้ตรงกับ CSS)
-const VISIBLE_ROOMS = 10   // แสดงทีละกี่ห้อง
+/* ===== จำกัดจำนวนห้องที่มองเห็นทีละ 10 แถว (ที่เหลือเลื่อนลง) ===== */
+const ROW_HEIGHT    = 56
+const HEADER_HEIGHT = 56
+const VISIBLE_ROOMS = 10
 const SCHEDULE_H    = computed(() => HEADER_HEIGHT + ROW_HEIGHT * VISIBLE_ROOMS)
 
 const centerLabels = computed(() => {
@@ -77,21 +74,21 @@ function recomputeMine() {
   myBooking.value = mine
 }
 
-let midnightTimer: number | null = null // ตั้งเวลา reload หลังข้ามวัน
+let midnightTimer: number | null = null
 
 async function loadData(){
   const ymd = todayLocalYMD()
-  const bust = Date.now() // กัน cache
+  const bust = Date.now()
   const [r1, r2] = await Promise.all([
     fetch('/api/rooms', { cache: 'no-store' }).then(r=>r.json()),
     fetch(`/api/bookings?date=${ymd}&_=${bust}`, { cache: 'no-store' }).then(r=>r.json()),
   ])
   rooms.value = r1
   bookings.value = r2
-  recomputeMine() // ✅ คำนวณสถานะของฉันทันทีหลังโหลด
+  recomputeMine()
 }
 
-function scheduleMidnightReload(){       // โหลดใหม่อัตโนมัติหลังเที่ยงคืน
+function scheduleMidnightReload(){
   if (midnightTimer) window.clearTimeout(midnightTimer)
   const now  = new Date()
   const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 1, 0) // 00:01
@@ -105,8 +102,6 @@ onMounted(async () => {
   await loadData()
   scheduleMidnightReload()
 })
-
-// ถ้า auth เปลี่ยน (เช่น ล็อกอินใหม่) ให้คำนวณใหม่
 watch(() => auth.studentId, recomputeMine)
 
 /* ===== คำนวณบล็อกจอง ===== */
@@ -192,7 +187,7 @@ async function handleBooked() {
   await loadData()
 }
 
-// เพิ่ม/แก้ฟังก์ชันให้ใช้ alert เมื่อมีจองวันนี้แล้ว
+/* ปุ่มจอง (ผู้ใช้) */
 function onClickBook() {
   if (hasBookingToday.value) {
     window.alert('วันนี้คุณได้ทำการจองห้องไปแล้ว\nหากต้องการจองใหม่ โปรดยกเลิกการจองปัจจุบันก่อน')
@@ -201,8 +196,13 @@ function onClickBook() {
   showBooking.value = true
 }
 
+/* ✅ คลิกบล็อกจอง: โหมดแอดมินให้ยิงอีเวนต์ขึ้นไป (รับ id ตรง ๆ) */
+function onBookingClick(bookingId: number) {
+  if (adminMode && typeof bookingId === 'number') {
+    emit('admin-open-cancel', bookingId)
+  }
+}
 </script>
-
 
 <template>
   <div class="page rooms">
@@ -216,9 +216,7 @@ function onClickBook() {
         {{ new Intl.DateTimeFormat('en-GB',{day:'2-digit',month:'long',year:'numeric'}).format(new Date()) }}
       </div>
 
-      <!-- กลุ่มปุ่มด้านขวา: ปุ่มแอดมิน + ปุ่มจอง อยู่แถบเดียวกัน -->
       <div class="date-actions">
-        <!-- ปุ่มของแอดมิน: แสดงเฉพาะตอนฝังในหน้าแอดมิน -->
         <template v-if="adminMode">
           <button type="button" class="btn-admin add"  @click="emit('admin-add')">
             เพิ่มห้อง <span class="pill">+</span>
@@ -228,8 +226,6 @@ function onClickBook() {
           </button>
         </template>
 
-        <!-- ปุ่มจอง (ผู้ใช้ทั่วไป) -->
-        <!-- ใหม่ -->
         <button type="button" class="btn-book" @click="onClickBook">
           <span>จองห้องประชุมที่นี่</span>
           <svg class="btn-icon" viewBox="0 0 48 48" aria-hidden="true">
@@ -241,20 +237,17 @@ function onClickBook() {
     </div>
 
     <!-- ตาราง -->
-    <!-- ใส่ maxHeight ให้เห็นทีละ 10 ห้อง (+ แถวหัว) ส่วนที่เหลือเลื่อนลง -->
     <div class="schedule" ref="scheduleRef" :style="{ maxHeight: SCHEDULE_H + 'px' }">
       <!-- HEADER -->
       <div class="row header">
         <div class="cell room-col"></div>
         <div class="cell hours-bar" :style="{ width: CANVAS_W + 'px' }">
-          <!-- ป้ายกลางคอลัมน์ 08..17 -->
           <div v-for="(it, i) in centerLabels"
                :key="i"
                class="hlabel"
                :style="{ left: it.left + 'px' }">
             {{ it.text }}
           </div>
-          <!-- เส้นซ้าย/ขวาสุด (08:00 / 17:00) -->
           <div class="edge edge-left"></div>
           <div class="edge edge-right" :style="{ left: ((DISPLAY_INTERVALS) * HOUR_WIDTH) + 'px' }"></div>
         </div>
@@ -264,9 +257,8 @@ function onClickBook() {
       <div class="row" v-for="r in rooms" :key="r.id">
         <div class="cell room-col room-code">{{ r.room_code }}</div>
 
-        <!-- แผงเวลา: กว้างตามแคนวาส 08..17 -->
+        <!-- แผงเวลา -->
         <div class="cell time-grid" :style="{ width: CANVAS_W + 'px' }">
-          <!-- เส้นชั่วโมงแนวตั้ง 08..17 -->
           <div v-for="i in (DISPLAY_INTERVALS + 1)"
                :key="'vl'+i"
                class="vline-abs"
@@ -276,6 +268,8 @@ function onClickBook() {
           <div v-for="b in (blocksByRoomId[r.id] || [])"
                :key="b.id"
                class="booking"
+               :data-booking-id="b.id"
+               @click.stop="onBookingClick(b.id)"
                :style="{ left: b.left + 'px', right: b.right + 'px' }"
                :title="b.label">
             <span class="b-title">{{ b.label }}</span>
@@ -284,10 +278,7 @@ function onClickBook() {
       </div>
     </div>
 
-    <!-- ✅ ฟังอีเวนต์ success เพื่อรีโหลด -->
     <BookingModal v-model:open="showBooking" @success="handleBooked" />
-
-    <!-- ✅ ซ่อนรีวิวเมื่อเป็นโหมดแอดมิน -->
     <ReviewRoom v-if="!adminMode" />
   </div>
 </template>
@@ -305,56 +296,31 @@ function onClickBook() {
 .today{ font-size:1.25rem; font-weight:700; color:#111827; }
 
 /* กลุ่มปุ่มด้านขวา */
-.date-actions{
-  display:flex;
-  align-items:center;
-  gap:10px;
-}
+.date-actions{ display:flex; align-items:center; gap:10px; }
 
-/* ปุ่มของแอดมินให้หน้าตาเข้ากับแถบนี้ */
+/* ปุ่มของแอดมิน */
 .btn-admin{
-  display:inline-flex;
-  align-items:center;
-  gap:.5rem;
+  display:inline-flex; align-items:center; gap:.5rem;
   font:700 14px/1.2 system-ui,-apple-system,Segoe UI,Roboto,'Noto Sans Thai',sans-serif;
-  border:0;
-  color:#111;
-  padding:8px 12px;
-  border-radius:10px;
-  box-shadow:0 4px 12px rgba(0,0,0,.12);
-  cursor:pointer;
+  border:0; color:#111; padding:8px 12px; border-radius:10px;
+  box-shadow:0 4px 12px rgba(0,0,0,.12); cursor:pointer;
   transition:filter .15s ease, transform .05s ease;
 }
 .btn-admin:hover{ filter:brightness(0.98); }
 .btn-admin:active{ transform:translateY(1px); }
-
-/* โทนสีตามเดิมของคุณ */
 .btn-admin.add{  background:#7dfc90; }
 .btn-admin.edit{ background:#ffe169; }
-
-/* จุดกลมเครื่องหมาย + */
 .btn-admin .pill{
-  display:inline-grid;
-  place-items:center;
-  width:18px; height:18px;
-  border-radius:50%;
-  background:#111; color:#fff;
-  font-weight:900; line-height:1;
+  display:inline-grid; place-items:center; width:18px; height:18px;
+  border-radius:50%; background:#111; color:#fff; font-weight:900; line-height:1;
 }
 
 /* ปุ่มจอง */
 .btn-book{
-  display:inline-flex;
-  align-items:center;
-  gap:10px;
-  background:#1F49FF;
-  color:#fff;
-  padding:8px 14px;
-  border:0;
-  border-radius:10px;
+  display:inline-flex; align-items:center; gap:10px;
+  background:#1F49FF; color:#fff; padding:8px 14px; border:0; border-radius:10px;
   font:600 14px/1.2 system-ui,-apple-system,Segoe UI,Roboto,'Noto Sans Thai',sans-serif;
-  box-shadow:0 4px 12px rgba(0,0,0,.12);
-  cursor:pointer;
+  box-shadow:0 4px 12px rgba(0,0,0,.12); cursor:pointer;
   transition:filter .15s ease, transform .05s ease;
 }
 .btn-book:hover{ filter:brightness(1.08); }
@@ -364,23 +330,15 @@ function onClickBook() {
 
 /* ตาราง */
 .schedule{
-  margin-top:14px;
-  border:1px solid #e5e7eb;
-  border-radius:10px;
-  overflow:auto; /* ทั้งแนวนอนและแนวตั้ง */
+  margin-top:14px; border:1px solid #e5e7eb; border-radius:10px; overflow:auto;
 }
 
 /* โครง */
 .row{
-  display:grid;
-  grid-template-columns:160px 1fr;
-  min-height:56px;
-  border-top:1px solid #f3f4f6;
-  position:relative;
+  display:grid; grid-template-columns:160px 1fr; min-height:56px;
+  border-top:1px solid #f3f4f6; position:relative;
 }
-.row.header{
-  position:sticky; top:0; z-index:2; background:#fff; border-top:0;
-}
+.row.header{ position:sticky; top:0; z-index:2; background:#fff; border-top:0; }
 
 /* เซลล์ */
 .cell{ padding:10px; }
@@ -388,28 +346,19 @@ function onClickBook() {
 .room-code{ font-weight:600; color:#374151; }
 
 /* hours-bar / time-grid ไม่มี padding */
-.cell.hours-bar,
-.cell.time-grid{ padding:0 !important; }
+.cell.hours-bar, .cell.time-grid{ padding:0 !important; }
 
 /* หัวตาราง */
-.hours-bar{
-  position:relative;
-  height:56px;
-  overflow: visible;   /* ให้ป้ายขอบไม่โดนตัด */
-}
+.hours-bar{ position:relative; height:56px; overflow:visible; }
 .hlabel{
   position:absolute; top:10px; transform:translateX(-50%);
   font-weight:600; color:#111827; pointer-events:none;
 }
 .edge{ position:absolute; top:0; bottom:0; border-left:1px dashed #e5e7eb; }
 .edge-left{ left:0; }
-.edge-right{ } /* วาง left ด้วย inline-style */
 
 /* แผงเวลา */
-.time-grid{
-  position:relative; display:block; height:56px;
-  overflow:hidden;
-}
+.time-grid{ position:relative; display:block; height:56px; overflow:hidden; }
 
 /* เส้นชั่วโมง */
 .vline-abs{
@@ -419,14 +368,10 @@ function onClickBook() {
 
 /* บล็อกจอง */
 .booking{
-  position:absolute; top:8px; bottom:8px;
-  box-sizing:border-box;
-  border-radius:10px; border:1px solid #9ee0cf;
-  background:#C4F1E5;
-  display:flex; align-items:center; padding:0 10px;
-  box-shadow:0 4px 10px rgba(0,0,0,.06);
-  overflow:hidden; white-space:nowrap; text-overflow:ellipsis;
-  z-index:1;
+  position:absolute; top:8px; bottom:8px; box-sizing:border-box;
+  border-radius:10px; border:1px solid #9ee0cf; background:#C4F1E5;
+  display:flex; align-items:center; padding:0 10px; box-shadow:0 4px 10px rgba(0,0,0,.06);
+  overflow:hidden; white-space:nowrap; text-overflow:ellipsis; z-index:1; cursor:pointer;
 }
 .booking .b-title{ font-size:12px; font-weight:600; color:#0f5132; }
 </style>
