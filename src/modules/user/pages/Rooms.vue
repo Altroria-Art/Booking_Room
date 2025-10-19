@@ -226,7 +226,7 @@ function onBookingClick(bookingId: number) {
           </button>
         </template>
 
-        <button type="button" class="btn-book" @click="onClickBook">
+        <button v-if="!adminMode"  type="button" class="btn-book" @click="onClickBook">
           <span>จองห้องประชุมที่นี่</span>
           <svg class="btn-icon" viewBox="0 0 48 48" aria-hidden="true">
             <circle cx="24" cy="24" r="20" fill="#FFFFFF"/>
