@@ -3,7 +3,7 @@
 import api from '@/plugins/axios'
 
 /* ========= helpers กันแคช ========= */
-export const stamp   = (params = {}) => ({ ...params, _: Date.now() }) // แนบ time-stamp ทุกครั้ง
+export const stamp   = (params = {}) => ({ ...params, _: Date.now() })
 export const noStore = { headers: { 'Cache-Control': 'no-store', 'Pragma': 'no-cache' } }
 
 /* ===================================
@@ -21,7 +21,6 @@ export const fetchRooms         = (params = {}) => api.get('/rooms', { params })
 export const createRoom         = (payload)      => api.post('/rooms', payload)
 export const updateRoom         = (id, payload)  => api.put(`/rooms/${id}`, payload)
 export const deleteRoom         = (id)           => api.delete(`/rooms/${id}`)
-// (เผื่อมี endpoint เปิด/ปิดห้องแบบเร็ว)
 export const toggleRoomActive   = (id, active)   => api.patch(`/rooms/${id}/active`, { active })
 
 /* ===================================
@@ -48,21 +47,19 @@ export const createBooking        = (payload)      => api.post('/bookings', payl
 /* ===================================
  * REVIEWS (ผู้ใช้)
  * ===================================*/
-export const fetchReviews         = (params = {}) => api.get('/reviews', { params }) // { page, pageSize, room_id }
-export const createReview         = (payload)      => api.post('/reviews', payload)   // { rating, comment, created_by, room_id? }
+export const fetchReviews         = (params = {}) => api.get('/reviews', { params })
+export const createReview         = (payload)      => api.post('/reviews', payload)
 
 /* ===================================
  * ADMIN: Reviews / Bookings
  * ===================================*/
-export const getAdminReviews        = (params = {}) => api.get('/reviews/admin', { params })           // { page, pageSize, room_id?, rating? }
+export const getAdminReviews        = (params = {}) => api.get('/reviews/admin', { params })
 export const getAdminReviewSummary  = (params = {}) => api.get('/reviews/admin/summary', { params })
 export const deleteAdminReview      = (id)            => api.delete(`/reviews/admin/${id}`)
 
-// ✅ รายการจองของวัน (กันแคช + no-store) — คืน .data ให้เลย
 export const getAdminBookings       = (params = {}) =>
   api.get('/bookings/admin', { params: stamp(params), ...noStore }).then(r => r.data)
 
-// ✅ ใช้กับป๊อปอัพยกเลิกการจอง (แอดมิน) — คืน .data ให้เลย
 export const getAdminBooking        = (id) =>
   api.get(`/bookings/admin/${id}`, { params: stamp(), ...noStore }).then(r => r.data)
 
@@ -74,7 +71,7 @@ export const getAdminBookingsData = (params = {}) => getAdminBookings(params)
 export const getAdminBookingData  = (id) => getAdminBooking(id)
 
 /* ===================================
- * default export (เผื่อบางไฟล์ import แบบ default)
+ * default export
  * ===================================*/
 export default {
   // helpers
